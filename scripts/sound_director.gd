@@ -24,6 +24,19 @@ func _restart_music() -> void:
     if main.music_on and music_player.stream!=null and main.phase!="menu":
         music_player.play()
 
+func silence_all() -> void:
+    if music_player!=null:
+        music_player.stop()
+        music_player.stream=null
+    for voice in impact_players:
+        if is_instance_valid(voice):
+            voice.stop()
+            voice.stream=null
+    stream_cache.clear()
+
+func _exit_tree() -> void:
+    silence_all()
+
 func change_world(index:int) -> void:
     var path="res://assets/audio/scroll_%02d.wav"%(index+1)
     if ResourceLoader.exists(path):
@@ -52,6 +65,14 @@ func play_drop() -> void:_fx("drop",1.0)
 func play_select() -> void:_fx("tap",1.0,-8)
 func play_place() -> void:_fx("place",1.0)
 func play_magic() -> void:_fx("magic",1.0)
+func play_uproar(tier:int) -> void:
+    if not main.spectacle_on:return
+    # Three separately pitched original samples form a deliberately ridiculous
+    # percussion stab. Each layer uses a different pooled voice, so the game
+    # stays responsive during a dense physics cascade.
+    _fx("blade",1.14+float(tier)*.12,1.0)
+    _fx("bell",.89+float(tier)*.16,3.0)
+    _fx("magic",1.0+float(tier)*.07,1.0)
 func on_settle() -> void:_fx("settle",1.0)
 func on_tribute() -> void:_fx("tribute",1.0)
 func on_loss() -> void:_fx("loss",1.0)
@@ -62,9 +83,13 @@ func play_impact(kind:String,combo:int,onbeat:bool) -> void:
     if kind in ["bell","beads","wheel"]:voice="bell"
     if kind in ["mask","ghost","gate","moon","cloud"]:voice="magic"
     if kind in ["swords","bamboo","fan"]:voice="blade"
-    _fx(voice,1.0+.043*float(n)+(.12 if onbeat else 0.0),-6 if combo<3 else -2)
+    var gain:float=-6.0 if combo<3 else (-1.0 if combo<10 else 1.5)
+    if main.spectacle_on and combo>=15 and combo%5==0:
+        _fx("tap",1.25+.02*float(n),-2)
+    _fx(voice,1.0+.043*float(n)+(.12 if onbeat else 0.0),gain)
 
-func on_beat(_beat:int) -> void:
-    # Rhythmic confirmation is mostly visual and embodied by pitched impacts.
-    # A permanently ticking metronome would fight the intentionally quiet music.
-    pass
+func on_beat(beat:int) -> void:
+    # Once a riot starts, the beat itself joins the percussion section.
+    # Idle days remain painterly and quiet, without a perpetual metronome.
+    if main.spectacle_on and main.mayhem_timer>0 and beat%2==0:
+        _fx("tap",1.08+float(main.mayhem_tier)*.12,-13)

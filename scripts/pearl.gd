@@ -1,6 +1,15 @@
 class_name JianghuPearl
 extends RigidBody2D
 
+const PEARL_ART={
+    "jade":preload("res://assets/pearls/jade.png"),
+    "copper":preload("res://assets/pearls/copper.png"),
+    "paper":preload("res://assets/pearls/paper.png"),
+    "fish":preload("res://assets/pearls/fish.png"),
+    "ghost":preload("res://assets/pearls/ghost.png"),
+    "iron":preload("res://assets/pearls/iron.png")
+}
+
 var main: Node2D
 var variant: String = "jade"
 var statuses: Dictionary = {}
@@ -15,6 +24,11 @@ var teleport_cooldown: float = 0.0
 var origin_actor: String = ""
 var last_actor: String = ""
 var last_hit_at: float = -100.0
+var route_history:Array[String]=[]
+var route_completed:Dictionary={}
+var route_recipes:int=0
+var impact_bloom:float=0.0
+var pen_angle:float=0.0
 
 func configure(host: Node2D, pearl_variant: String, family_id: int, main_pearl: bool = true) -> void:
     main=host
@@ -47,6 +61,9 @@ func _physics_process(delta: float) -> void:
         return
     teleport_cooldown=maxf(0.0, teleport_cooldown-delta)
     world_gravity_timer=maxf(0.0,world_gravity_timer-delta)
+    impact_bloom=maxf(0.0,impact_bloom-delta*3.4)
+    if linear_velocity.length_squared()>40:
+        pen_angle=lerp_angle(pen_angle,linear_velocity.angle(),minf(1.0,delta*9.0))
     main.apply_world_physics(self,delta)
     if trail.is_empty() or trail[-1].distance_to(position)>3.3:
         trail.append(position)
@@ -55,6 +72,7 @@ func _physics_process(delta: float) -> void:
 
 func _on_body_entered(body:Node) -> void:
     if not collected and main!=null:
+        impact_bloom=1.0
         main.on_pearl_hit(self,body)
 
 func set_status(key:String, count:int=3) -> void:
@@ -69,31 +87,58 @@ func consume_statuses() -> void:
         if statuses[key]<=0: statuses.erase(key)
 
 func _draw() -> void:
-    var base:=Color(.48,.78,.68)
+    var base:=Color(.49,.76,.67)
+    var ink:=Color(.17,.29,.26)
     match variant:
-        "copper": base=Color(.82,.59,.32)
-        "paper": base=Color(.96,.89,.76)
-        "fish": base=Color(.59,.80,.9)
-        "ghost": base=Color(.70,.79,.95)
-        "iron": base=Color(.55,.60,.62)
+        "copper":
+            base=Color(.84,.56,.27)
+            ink=Color(.49,.28,.16)
+        "paper":
+            base=Color(.94,.78,.62)
+            ink=Color(.64,.30,.24)
+        "fish":
+            base=Color(.54,.79,.92)
+            ink=Color(.21,.42,.63)
+        "ghost":
+            base=Color(.72,.70,.97)
+            ink=Color(.41,.37,.63)
+        "iron":
+            base=Color(.66,.68,.67)
+            ink=Color(.29,.32,.35)
+    # The physical trail is painted with the moving pearl's own material:
+    # a calligraphic wet stroke, diluted halo, then occasional pigment drops.
     for i in range(1,trail.size()):
         if main!=null and main.reduce_motion and i<trail.size()-4:continue
         var local_a:=to_local(trail[i-1])
         var local_b:=to_local(trail[i])
         var weight=float(i)/float(trail.size())
-        # The pearl writes a brush line into the world. Strokes thicken near
-        # the moving nib, and their diluted ink echoes Chinese wash painting.
-        draw_line(local_a,local_b,Color(.14,.15,.14,weight*.22),.8+weight*5.2,true)
-        draw_line(local_a,local_b,Color(base.r,base.g,base.b,weight*.35),.55+weight*2.7,true)
-    draw_circle(Vector2.ZERO,12.2,Color(base.r,base.g,base.b,.15))
-    draw_circle(Vector2.ZERO,9.2,Color(.13,.19,.18,.85))
-    draw_circle(Vector2.ZERO,7.8,base)
-    draw_circle(Vector2(-2.4,-3.2),2.4,Color(1,1,1,.67))
-    if statuses.has("drunk"):draw_arc(Vector2.ZERO,11.0,0,TAU,20,Color(.82,.37,.35),1.5)
-    if statuses.has("blessed"):draw_arc(Vector2.ZERO,13.0,0,TAU,20,Color(.95,.8,.35),1.5)
-    if statuses.has("cursed") or statuses.has("poison"):draw_arc(Vector2.ZERO,12.4,0,TAU,20,Color(.38,.27,.59),1.6)
-    if statuses.has("wanted"):draw_circle(Vector2(7,-9),2.6,Color(.79,.26,.22))
+        draw_line(local_a,local_b,Color(ink,weight*.16),1.5+weight*7.2,true)
+        draw_line(local_a,local_b,Color(base,weight*.36),.8+weight*3.6,true)
+        if i%4==0 and (main==null or not main.reduce_motion):
+            draw_circle(local_b,1.0+weight*3.4,Color(base,weight*.11))
+            var dir:Vector2=(local_b-local_a).normalized().orthogonal()
+            draw_line(local_b,local_b+dir*(4.0+weight*6.0),Color(ink,weight*.09),1.0,true)
+    var halo:float=13.6+impact_bloom*5.0
+    draw_circle(Vector2.ZERO,halo,Color(base,.11+impact_bloom*.16))
+    draw_arc(Vector2.ZERO,13.3,PI*.16,PI*1.92,35,Color(ink,.33),1.15,true)
+    # The albedo is authored watercolor rather than a flat primitive. A
+    # slightly oversized translucent silhouette remains readable on iPhone.
+    var painting:Texture2D=PEARL_ART.get(variant,PEARL_ART["jade"])
+    draw_texture_rect(painting,Rect2(-15.3,-15.3,30.6,30.6),false,Color(1,1,1,.98))
+    if statuses.has("drunk"):draw_arc(Vector2.ZERO,16.0,PI*.07,TAU*.88,26,Color(.78,.31,.30,.9),1.7,true)
+    if statuses.has("blessed"):draw_arc(Vector2.ZERO,17.5,0,TAU,34,Color(.94,.73,.27,.77),1.35,true)
+    if statuses.has("cursed") or statuses.has("poison"):
+        draw_arc(Vector2.ZERO,17.0,PI*.11,PI*1.72,31,Color(.38,.27,.59,.86),1.75,true)
+    if statuses.has("wanted"):
+        draw_line(Vector2(11,-14),Vector2(17,-20),Color(.79,.21,.21,.95),2.0,true)
+        draw_circle(Vector2(17,-20),2.4,Color(.79,.21,.21))
+    if impact_bloom>0 and (main==null or not main.reduce_motion):
+        for j in range(5):
+            var angle:float=float(j)*TAU/5.0+pen_angle*.27
+            var tip:Vector2=Vector2.RIGHT.rotated(angle)*(21.0+(1.0-impact_bloom)*12.0)
+            draw_line(tip-Vector2.RIGHT.rotated(angle)*7,tip,Color(ink,impact_bloom*.45),1.2+impact_bloom*1.6,true)
+            draw_circle(tip,1.1+impact_bloom*1.6,Color(base,impact_bloom*.58))
     if main!=null and main.rhythm_chain>=3 and not main.reduce_motion:
         var glow:float=.22+.16*sin(main.beat_clock*TAU*float(main.world_data.bpm)/60.0)
-        draw_arc(Vector2.ZERO,15.4,PI*.27,PI*1.68,31,Color(.84,.65,.33,glow),1.6,true)
+        draw_arc(Vector2.ZERO,19.2,PI*.27,PI*1.68,31,Color(.84,.65,.33,glow),1.7,true)
 

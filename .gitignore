@@ -1,0 +1,16 @@
+# Generated engine caches and local browser export; CI reconstructs both.
+/.godot/
+/dist/
+/.import/
+
+# Local editor and operating-system artifacts.
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Local export products belong in the compiled Web release, not in source.
+/index.wasm
+/index.pck
+/index.js
+/index.html

@@ -12,18 +12,21 @@ func run() -> void:
     for world in range(8):
         game.start_dream(world)
         game._begin_aim()
+        game._choose_stance(world%3)
         game.launch_x=195
         game.aim_angle=-.13 if world%2==0 else .21
         game._launch()
         await create_timer(3.4).timeout
         var earned:int=game.earnings_drop
         if earned>0:productive+=1
-        print("WORLD ",world+1," / ",game.world_data.name," / taels=",earned," / combo=",game.combo_count," / pearls=",game.active_pearls.size())
+        print("WORLD ",world+1," / ",game.world_data.name," / stance=",game.shot_stance," / taels=",earned," / combo=",game.combo_count," / pearls=",game.active_pearls.size())
         for pearl in game.active_pearls.duplicate():
             game._settle_pearl(pearl)
         game._end_drop()
+    game.sound.silence_all()
     game.queue_free()
     await process_frame
+    await create_timer(.45).timeout
     await process_frame
     await process_frame
     print("PHYSICS PLAYTEST: ",productive," / 8 worlds earned silver in 3.4s")

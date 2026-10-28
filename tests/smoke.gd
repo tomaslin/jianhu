@@ -6,6 +6,9 @@ const Catalog=preload("res://scripts/world_catalog.gd")
 const District=preload("res://scripts/district_system.gd")
 const BoonCatalog=preload("res://scripts/boon_catalog.gd")
 const Reactions=preload("res://scripts/reaction_catalog.gd")
+const Chains=preload("res://scripts/chain_catalog.gd")
+const Writs=preload("res://scripts/commission_catalog.gd")
+const Rivals=preload("res://scripts/rival.gd")
 var failures:int=0
 var checks:int=0
 
@@ -26,6 +29,31 @@ func run_all() -> void:
     check(Catalog.WORLDS.size()==8,"eight authored worlds")
     check(Catalog.ACTORS.size()==48,"48 authored economic/martial citizens")
     check(BoonCatalog.BOONS.size()==56,"56 authored rule-bending wuxia boons")
+    check(Chains.CHAINS.size()==36,"36 ordered multi-household wuxia chain performances")
+    check(Writs.WRITS.size()==24,"24 authored world-specific martial commissions")
+    check(Rivals.RIVALS.size()==8,"each world has its own physical fifth-day rival")
+    var rival_moves={}
+    for rival_spec in Rivals.RIVALS:
+        rival_moves[str(rival_spec.move)]=true
+    check(rival_moves.size()==8,"all eight rivals retaliate with different physics or economic consequences")
+    var writ_ids={}
+    for w in Writs.WRITS:
+        check(not writ_ids.has(str(w.id)),"each world writ is unique: "+str(w.id))
+        writ_ids[str(w.id)]=true
+        check(int(w.target)>0 and int(w.reward)>0 and int(w.seals)>0,"writ tracks actual targets and pays two resources")
+    for index in range(8):
+        check(Writs.for_world(index).size()==3,"each of eight worlds has three distinct commissions")
+    var chain_ids={}
+    var chain_actions={}
+    for chain in Chains.CHAINS:
+        check(not chain_ids.has(str(chain.id)),"unique authored chain: "+str(chain.id))
+        chain_ids[str(chain.id)]=true
+        chain_actions[str(chain.action)]=true
+        check(chain.steps.size()>=2 and chain.steps.size()<=3,"each recipe has a genuine two/three-stop route")
+        for piece in chain.steps:
+            check(int(Catalog.actor(str(piece)).cost)>0,"chain routes reference real citizens: "+str(piece))
+        check(int(chain.silver)>100 and float(chain.power)>0,"chain reward creates real economic and physical value")
+    check(chain_actions.size()>=10,"chain recipes have ten different physical consequence families")
     check(Reactions.REACTIONS.size()==48,"all 48 citizens have a secondary conditional secret form")
     check(Reactions.mastery_level(5)==0,"early street rank is untrained")
     check(Reactions.mastery_level(6)==1 and Reactions.mastery_level(18)==2 and Reactions.mastery_level(40)==3,"three distinct earned mastery thresholds")
@@ -44,6 +72,20 @@ func run_all() -> void:
         check(str(Reactions.REACTIONS[str(info.id)].ascension).length()>8,"actor %s has a named third-stage evolution"%str(info.id))
         actor_ids[str(info.id)]=true
     check(actor_ids.size()==48,"all 48 authored entries are distinguishable")
+    for color in ["jade","copper","paper","fish","ghost","iron"]:
+        var sprite_path="res://assets/pearls/"+color+".png"
+        check(ResourceLoader.exists(sprite_path),"a separate painted "+color+" pearl exists in the Godot resource pipeline")
+        check((load(sprite_path) as Texture2D).get_width()>=128,"painted pearls retain adequate high-DPI texture detail")
+    check(Chains.synergy("drunken",["inn"])>0,"dragon inn unlocks a compatible route partner")
+    var draft_a=RandomNumberGenerator.new()
+    var draft_b=RandomNumberGenerator.new()
+    draft_a.seed=2674
+    draft_b.seed=2674
+    var sample_owned:Array[String]=["inn","tea","merchant"]
+    var choices_a:Array[String]=Catalog.offers(0,sample_owned,draft_a)
+    var choices_b:Array[String]=Catalog.offers(0,sample_owned,draft_b)
+    check(choices_a==choices_b,"drafting is deterministic for a saved seed")
+    check(choices_a[0]!=choices_a[1] and choices_a[0]!=choices_a[2] and choices_a[1]!=choices_a[2],"draft slots are distinct")
     check(game.city_stage!=null,"the inhabited ink border is instantiated")
     var mechanics:Dictionary={}
     var palette:Dictionary={}
@@ -198,6 +240,238 @@ func run_all() -> void:
         hits_pearl.queue_free()
     check(game.active_actors[0].get_child_count()>1,"buildings provide extra physical architecture")
 
+    # A real two-stop physical journey performs an original chain technique;
+    # the outcome is capped per pearl and the discovery survives safe saves.
+    game.start_dream(0)
+    var route_pearl=preload("res://scripts/pearl.gd").new()
+    route_pearl.configure(game,"jade",187,true)
+    game.add_child(route_pearl)
+    var tea_actor=game.active_actors[1]
+    var inn_actor=game.active_actors[0]
+    game._activate_actor(route_pearl,tea_actor)
+    game._activate_actor(route_pearl,inn_actor)
+    check(route_pearl.route_recipes==1,"tea then inn triggers its ordered wuxia performance")
+    check(route_pearl.route_completed.has("unpaid_banquet"),"the actual route is recorded on its pearl")
+    check(game.known_chains.has("unpaid_banquet"),"the new chain is discovered for this scroll")
+    check(route_pearl.statuses.has("drunk"),"an authored route changes the traveller's physical status")
+    check(game.training_seals>=1,"route discoveries award spendable martial credits")
+    game._activate_actor(route_pearl,tea_actor)
+    game._activate_actor(route_pearl,inn_actor)
+    check(route_pearl.route_recipes==1,"a chain cannot be farmed twice by one pearl")
+    route_pearl.queue_free()
+    game.save_run()
+    game.restore_run()
+    check(game.known_chains.has("unpaid_banquet"),"named chain discoveries are serialized")
+
+    # Physics modifiers must be computed from status rather than compounded
+    # every tick: one previously made the ball motionless on Web after seconds.
+    game.start_dream(0)
+    var damp_pearl=preload("res://scripts/pearl.gd").new()
+    damp_pearl.configure(game,"jade",198,true)
+    game.add_child(damp_pearl)
+    game.boons.append("stone_sandals")
+    game.phase="dropping"
+    for tick in range(240):game.apply_world_physics(damp_pearl,1.0/60.0)
+    check(damp_pearl.linear_damp<.5,"sticky motion boon no longer accumulates unbounded drag")
+    damp_pearl.queue_free()
+    game.start_dream(6)
+    var cargo_pearl=preload("res://scripts/pearl.gd").new()
+    cargo_pearl.configure(game,"copper",199,true)
+    game.add_child(cargo_pearl)
+    game.phase="dropping"
+    cargo_pearl.set_status("goods",4)
+    game.apply_world_physics(cargo_pearl,1.0/60.0)
+    check(cargo_pearl.mass>1.4,"loaded freight has an objectively heavier physical body")
+    cargo_pearl.statuses.erase("goods")
+    game.apply_world_physics(cargo_pearl,1.0/60.0)
+    check(is_equal_approx(cargo_pearl.mass,1.0),"selling cargo restores a normal pearl mass")
+    cargo_pearl.queue_free()
+
+    # The wager is explicitly chosen, earned by live event counters, and
+    # carries a small but real failure penalty rather than passive rewards.
+    game.start_dream(0)
+    check(game._choose_writ(0),"players can commit to one optional morning writ")
+    check(game.chosen_writ=="valley_trade","the writ choice belongs to the current city")
+    check(not game._choose_writ(1),"cannot take all three commissions at once")
+    for trade_hit in range(5):game._record_writ("trade")
+    check(game.writ_progress==5,"real trade impact events advance the selected objective")
+    game.shot_number=2
+    game.phase="dropping"
+    game._end_drop()
+    check(game.writ_result=="completed","the two-pearl day honors a met commission")
+    check(game.treasury>0,"a fulfilled commission adds spendable silver")
+    game.restore_run()
+    check(game.writ_result=="completed" and game.writ_progress==5,"commissions survive safe-phase save and resume")
+    game._advance_day()
+    check(game.chosen_writ=="" and game.writ_progress==0,"a new day offers a fresh decision")
+    check(game._choose_writ(1),"players may choose a different kind of challenge the next day")
+    game.treasury=0
+    game.shot_number=2
+    game.phase="dropping"
+    game._end_drop()
+    check(game.writ_result=="failed","an unmet optional wager is reported honestly")
+    check(game.debt>=Writs.risk_for(game.day),"failing a wager creates a real economic liability")
+
+    # Bosses are physics bodies with duel health, distinct counter-effects,
+    # persistent damage and a reward that can finance longer training paths.
+    for index in range(8):
+        game.start_dream(index)
+        game.day=5
+        game._summon_rival()
+        check(game.rival!=null,"world %d summons a tangible rival on day five"%index)
+        if game.rival==null:continue
+        check(game.rival.health==4 and game.rival.max_health==4,"world %d rival starts with four wounds"%index)
+        game.rival.health=3
+        game.phase="build"
+        game.save_run()
+        game.restore_run()
+        check(game.rival!=null and game.rival.health==3,"world %d rival wounds persist across an interrupted dream"%index)
+        var duel_pearl=preload("res://scripts/pearl.gd").new()
+        duel_pearl.configure(game,"jade",225+index,true)
+        game.add_child(duel_pearl)
+        game.phase="dropping"
+        var old_health:int=game.rival.health
+        game._hit_rival(duel_pearl)
+        check(game.rival!=null and game.rival.health<old_health,"world %d responds to a real pearl duel"%index)
+        if index==1:check(duel_pearl.statuses.has("cursed"),"the silent abbot's retaliation curses the pearl")
+        if index==5:check(duel_pearl.statuses.has("poison"),"the marsh rival uses venom rather than abstract damage")
+        var old_seals:int=game.training_seals
+        game.rival.health=1
+        game.rival.last_contact.clear()
+        game._hit_rival(duel_pearl)
+        check(game.rival_defeated and game.rival==null,"world %d has a beatable, disappearing rival"%index)
+        check(game.training_seals>=old_seals+2,"world %d rival pays martial training credits"%index)
+        duel_pearl.queue_free()
+    game.start_dream(0)
+    game.day=10
+    game._summon_rival()
+    check(game.rival!=null and game.rival.max_health==5,"second rival appearance has more health")
+    game.day=15
+    game._summon_rival()
+    check(game.rival!=null and game.rival.max_health==6,"final rival appearance has maximum health")
+    game.treasury=0
+    game.shot_number=2
+    game.phase="dropping"
+    game._end_drop()
+    check(game.debt>=360,"an undefeated final rival creates a real toll debt")
+
+    # First-run education is a four-scene interactive overlay, never a modal
+    # text wall. The player acts through the actual build/aim/drop/report loop.
+    game.tutorial_done=false
+    game.start_dream(0)
+    check(game.tutorial_stage==0 and game.tutorial_hint_timer>0,"the first dream opens with a visible construction tip")
+    game._begin_aim()
+    check(game.tutorial_stage==1,"the real play button advances the aim tutorial")
+    game._launch()
+    check(game.tutorial_stage==2,"launch advances into the playable action tutorial")
+    for pearl in game.active_pearls.duplicate():game._settle_pearl(pearl)
+    game._end_drop()
+    check(game.tutorial_stage==1,"the second shot receives its own practical aim hint")
+    game._launch()
+    for pearl in game.active_pearls.duplicate():game._settle_pearl(pearl)
+    game._end_drop()
+    check(game.tutorial_stage==3 and game.phase=="report","the actual second shot teaches the day report")
+    game._next_day()
+    check(game.tutorial_done and game.tutorial_stage==-1,"the teaching sequence completes permanently after turning the page")
+    game.tutorial_done=false
+    game.start_dream(0)
+    game._press_at(Vector2(306,231))
+    check(game.tutorial_done and game.tutorial_stage==-1,"the tutorial can be skipped with a 79-by-47-point touch target")
+
+    # Hitting combo milestones changes rigid-body forces, generates offspring,
+    # boosts real revenue and earns martial seals. Quiet settings must not
+    # secretly disable these consequences.
+    game.start_dream(0)
+    game._begin_aim()
+    game._launch()
+    var fever_pearl=game.active_pearls[0]
+    var fever_actor=game.active_actors[0]
+    for contact in range(7):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==1 and game.mayhem_timer>0,"seven consecutive impacts ignite active mayhem physics")
+    check(game.mayhem_triggered.has("1") and not game.spawn_queue.is_empty(),"first mayhem creates a physical extra pearl")
+    for contact in range(10):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==2 and game.mayhem_triggered.has("2"),"seventeen impacts amplify the riot")
+    check(fever_pearl.statuses.has("blessed"),"second mayhem stage alters the pearl's combat state")
+    for contact in range(14):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==3 and game.mayhem_triggered.size()==3,"thirty-one impacts unlock the final distinct burst")
+    var baseline_bank:int=game.treasury
+    game._award(100,Vector2(195,350),"spectacle test")
+    check(game.treasury-baseline_bank>=130,"active third-stage mayhem provides a monetary multiplier")
+    check(not game.comic_stamps.is_empty() and not game.paper_confetti.is_empty(),"reactions emit real kinetic impact typography and debris")
+    game.spectacle_on=false
+    var old_stamp_count:int=game.comic_stamps.size()
+    game._comic(Vector2(195,350),"OFF MEANS OFF",3)
+    check(game.comic_stamps.size()==old_stamp_count,"the spectacle switch suppresses surplus effects")
+    game.spectacle_on=true
+    game.reduce_motion=true
+    game.paper_confetti.clear()
+    game._comic(Vector2(195,350),"CALM",3)
+    check(game.paper_confetti.is_empty(),"reduced-motion mode preserves readable feedback without flying confetti")
+    game.reduce_motion=false
+
+    # Three distinct, touch-sized opening stances trade economy against
+    # motion, offspring and player control. The choice persists at safe saves.
+    game.start_dream(0)
+    check(game.shot_stance=="crane","Crane is the predictable first-run stance")
+    game._begin_aim()
+    check(game._choose_stance(1) and game.shot_stance=="tiger","Tiger is an explicit alternative risk stance")
+    game.restore_run()
+    check(game.shot_stance=="tiger" and game.phase=="aim","stance selection survives safe-phase reload")
+    game._launch()
+    check(game.debt==35,"Tiger speed and profit cost 35 debt per shot")
+    check(game.active_pearls[0].linear_velocity.length()>200,"Tiger launches with a materially faster physical velocity")
+    var tiger_before:int=game.treasury
+    game._award(100,Vector2(195,350),"stance test")
+    check(game.treasury-tiger_before==128,"Tiger profit multiplier really changes scoring")
+    game.qi_charge=6
+    var pilot_pearl=game.active_pearls[0]
+    var velocity_before:Vector2=pilot_pearl.linear_velocity
+    check(game._qi_flick(pilot_pearl.position+Vector2(24,22)),"the player can touch a flying pearl to make a martial parry")
+    check(game.qi_charge==3 and game.qi_spent==1,"each physical Qi flick spends exactly three earned credits")
+    await create_timer(.08).timeout
+    check(pilot_pearl.linear_velocity!=velocity_before,"Qi flick is a meaningful impulse, not a point popup")
+    check(not game._qi_flick(pilot_pearl.position),"a short cooldown prevents touch-button spamming")
+    game.qi_cooldown=0
+    game._set_pause(true)
+    check(not game._qi_flick(pilot_pearl.position),"pausing also disables martial steering")
+    game._set_pause(false)
+    game.qi_cooldown=0
+    check(not game._qi_flick(Vector2(40,620)),"Qi can't be spent on an arbitrary empty part of the board")
+
+    game.start_dream(0)
+    game._begin_aim()
+    game._press_at(Vector2(296,618))
+    check(game.shot_stance=="monkey","the 107-by-48 Monkey stance responds to actual UI touch")
+    game.restore_run()
+    check(game.shot_stance=="monkey","Monkey stance survives save and restore")
+    game._launch()
+    check(game.spawn_queue.size()==1,"Monkey starts each drop with an additional physical paper offspring queued")
+    game._flush_spawn_queue()
+    check(game.active_pearls.size()>=2,"Monkey's extra paper pearl actually exists in the physics world")
+    var monkey_before:int=game.treasury
+    game._award(100,Vector2(195,350),"stance test")
+    check(game.treasury-monkey_before==78,"Monkey's second projectile comes at a clear economic opportunity cost")
+
+    game.start_dream(0)
+    game._begin_aim()
+    game._launch()
+    check(game.qi_charge==2,"Crane starts with two Qi towards a potential parry")
+    var crane_pearl=game.active_pearls[0]
+    crane_pearl.hits=2
+    crane_pearl.position=Vector2(195,701)
+    game._settle_pearl(crane_pearl)
+    check(game.rescue_spent and game.active_pearls.has(crane_pearl),"a poor Crane drop gets exactly one physical second wind")
+    check(crane_pearl.position.y<500 and crane_pearl.linear_velocity.y<0,"second wind visibly launches the seed back into the fight")
+    check(game.qi_charge==3,"rescued players receive one small additional tactical Qi charge")
+    game._settle_pearl(crane_pearl)
+    check(not game.active_pearls.has(crane_pearl),"the same seed cannot farm infinite rescues")
+    game.start_dream(0)
+    game._begin_aim()
+    game._launch()
+    var actor_qi:int=game.qi_charge
+    game._activate_actor(game.active_pearls[0],game.active_actors[0])
+    check(game.qi_charge>actor_qi,"hitting named citizens earns spendable Qi")
+
     # Full UI-economic state transitions, serialization, tribute and ending.
     game.start_dream(0)
     game.treasury=3000
@@ -269,8 +543,10 @@ func run_all() -> void:
     game._pay_tribute()
     check(game.phase=="victory","fifth tribute completes a scroll")
     check(game.world_stamps.has("valley"),"victory stamps the journal")
+    game.sound.silence_all()
     game.queue_free()
     await process_frame
+    await create_timer(.65).timeout
     await process_frame
     await process_frame
     print("JIANGHU SMOKE: ",checks," checks, ",failures," failures")

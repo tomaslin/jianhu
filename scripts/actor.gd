@@ -90,6 +90,11 @@ func _draw() -> void:
         "rogue":school_color=Color("#A44B48")
         "wanderer":school_color=Color("#B28A48")
     var exterior := Color(0.97, .94, .84, .96)
+    # Visual-only squash, recoil and breath. Colliders remain fixed so players
+    # can still learn precise trajectories through the crowded town.
+    var bob:float=0.0 if main.reduce_motion else sin(idle_clock*2.8+socket.x*.73)*1.1
+    var knock:float=0.0 if main.reduce_motion else sin(idle_clock*26.0+socket.y)*pulse*.14
+    draw_set_transform(Vector2(0,bob),knock,Vector2(1.0+pulse*.08,1.0-pulse*.065))
     _draw_architecture(str(data.get("kind","stone")),deep,accent)
     draw_circle(Vector2.ZERO, radius + pulse * 6.0, Color(accent.r, accent.g, accent.b, .12 + pulse * .13))
     draw_circle(Vector2.ZERO, radius + 2.0, deep)
@@ -112,6 +117,7 @@ func _draw() -> void:
             var angle=TAU*float(i)/3.0+idle_clock*.6
             var outward=Vector2.RIGHT.rotated(angle)*(20+14*(1-pulse))
             draw_line(outward,outward+Vector2.RIGHT.rotated(angle+.26)*10,Color(deep,pulse*.61),2.2,true)
+    draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE)
 
 func _draw_architecture(kind:String,deep:Color,tint:Color) -> void:
     # A companion is a *place* as much as an icon. Awnings, dojo roofs, bridges

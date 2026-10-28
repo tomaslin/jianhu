@@ -1,5 +1,5 @@
 # DREAMING OF JIANGHU
-## A playable design specification — Version 0.7, The Living Border City
+## A playable design specification — Version 0.11, The Fighting Dream
 
 > The jianghu is not a map. It is a machine for turning strangers into debts.
 
@@ -41,6 +41,10 @@ rhythms and tiny consequences**. Text is short, precise and legible.
 | Upgrade a place | Inspect an address, tap its 149×51pt Upgrade button | Spend taels on a real new collision storey; up to five |
 | Open kung fu path | Inspect a resident, tap the 151×51pt Kung Fu button | Four connected forms, practice milestones and a martial seal purse |
 | Train a resident | Tap a 104×50pt school choice, then a 240×51pt next-form button | Persistent Righteous, Rogue or Wanderer lineage with new physics at each rank |
+| Pick a shot stance | Tap one of three 107×48pt buttons above aim rails | Crane rescues, Tiger speeds and earns at debt, Monkey spawns an accomplice |
+| Qi Parry during flight | Tap within 100pt of a moving pearl, costs 3 of 9 Qi | Directional impulse, short cooldown, bonus for on-beat skill |
+| Choose a martial writ | Tap one of three 104×50pt morning contract seals | Commit to a world-specific measurable feat; earn silver/seals or owe a failure debt |
+| Duel a rival | Aim a pearl at the day-5/10/15 moving masked opponent | Timed impacts remove health, retaliation changes travel, trained citizens amplify damage |
 
 No small corner gesture is required for the core loop. Hover is not part of
 the control scheme. iPhone 13 Pro uses a native 390×844 portrait design.
@@ -182,6 +186,14 @@ now have multiple meaningful axes rather than a single on-hit point value:
   that depends on where actors live, and can be reorganized.
 - **56 run boons:** independent physical, economic and scoring laws that can
   change the behavior of the entire cast.
+- **36 physical sequence recipes:** unlike adjacency, these require real
+  ordered hits. Example: a pearl must actually strike the Tea Stall before
+  the Dragon Inn to perform the Unpaid Banquet. Each pearl can complete a
+  route only once, at most five total; the sequence is discovered in the
+  campaign journal and may change velocity, physics, status or offspring.
+- **Eight rival mechanics:** each fifth-day opponent moves as an animatable
+  collider and retaliates with an authored world-specific rule. Cultivated
+  citizens contribute actual combat leverage, not just passive damage stats.
 
 This is a dense, replayable **system of interacting rule layers**, not yet a
 claim that there are as many distinct base actors as Ballionaire. The next
@@ -242,6 +254,132 @@ the player performs on the very physics object already in flight**. The game
 shows its cost (once per day), grays it out after use, and renews it next
 morning. This adds a moment of control without trivializing carefully built
 paths.
+
+### Route choreography: 36 combinations that must physically happen
+
+Adjacency oaths are a static question—*who lives next door?* Route recipes
+are dynamic—*whom did this specific pearl meet, and in which order?*
+The `chain_catalog.gd` defines 36 named combinations with two or three actor
+IDs each. A pearl keeps a short route history; the system tests suffixes of
+that history against the entire catalog after a real actor activation. A
+matching recipe can change trajectory with one of these authored action
+families:
+
+| Technique consequence | Actual world change |
+| --- | --- |
+| Spring / lateral / flip | Strong vertical strike, side kick or reversed velocity |
+| Paper / copper / iron / spirit | Material metamorphosis or new offspring of that type |
+| Drunken / blessing / ambush | Status, momentum and economic transformation |
+| Cargo / rain | Freight changes or a staged extra pearl |
+| Exorcise / teleport | Cleanse a curse or cross the board in a single leap |
+
+A discovery grants silver and training seals, but each recipe fires at most
+once per pearl and a pearl cannot trigger more than five recipes. No text
+adventure choice is substituted for physical contact. This also makes draft
+selection legible: the three offers now favor an undiscovered compatible
+piece, an underrepresented role and a deliberately novel wildcard.
+
+### Immediate pleasures: onboarding, mayhem, comedy and sensory rhythm
+
+**Four-step, diegetic onboarding:** The first dream highlights one actual
+touch target at a time while permitting normal play. Building points to the
+PLAY button; aiming points to the release action and explains ENTRY/ANGLE;
+the drop reveals the one-use martial technique; the day report teaches the
+next morning. These cues auto-advance on real phase transitions and never
+block the physics. A 79×47-point SKIP control completes onboarding immediately
+and persists the choice in settings. The guidance deliberately contains one
+sentence per scene, not an instructional scroll.
+
+**Three-stage MAYHEM:** When contacts in one pearl's drop reach 7, 17 and 31,
+the city detonates an authored original action-comedy beat. Stage 1 adds an
+upward deflection and a paper child; stage 2 blesses the moving projectile,
+redirects others and launches a copper child; stage 3 adds iron/paper offspring,
+a heavier knockback and debt relief. Each stage lasts 4.85–6.15 seconds,
+introducing sideways swirls, lift and a temporary 12/24/36% economic bonus.
+This rewards a *planned physical cascade* without letting a high combo run
+forever. Daughter pearls remain subject to the existing birth/field limits.
+The mayhem timer resets at the day's ledger, so a dead burst cannot enrich
+the next morning's unrelated finances.
+
+**Three sensory layers, no cutscenes:** Every fourth named impact can print a
+short world-specific comic exclamation; successful chain recipes, training,
+renovations, rival knockouts and tribute payments get stronger stamps. The
+shards are colorful rag-paper, not generic UI confetti. Existing original
+foley voices are dynamically pitched and layered with a tempo accent only
+during heightened mayhem. Characters breathe, recoil and squash visually,
+while their fixed colliders preserve precise play and predictable routing.
+
+**Accessibility guardrail:** `Spectacle & Mayhem FX` is enabled by default
+and suppresses exuberant motion/stinger layers when switched off; all
+bonuses and trajectory changes still happen. `Reduced Motion` freezes
+decorative travel and suppresses paper shards, but keeps a single readable
+impact caption. No mandatory rhythmic timing window was made narrower.
+
+### Player agency inside the physics: stance and Qi
+
+This revision directly addresses the gap between watching an automated peg
+drop and feeling like a wuxia performer. There are two coupled decisions:
+
+1. **Before each shot**, choose among three asymmetric stances. *Crane*
+   starts with two Qi, gently resists early gravity and allows a rescue even
+   after three contacts. *Tiger* fires its seed roughly 71% faster, earns
+   28% more live-drop silver, but incurs 35 debt. *Monkey* starts with a
+   second paper projectile and accepts a 22% payout haircut. Each choice
+   works with one-thumb touch buttons and persists at safe save points.
+2. **During the fall**, each named-actor strike earns one Qi, plus another
+   for good rhythm and one from a trained second-form master. Up to nine Qi
+   can be banked per shot. A tap within 100 logical points of a pearl spends
+   three Qi, kicking the nearest rigid body upward and sideways toward the
+   touch. Perfect on-beat parries provide additional lift and pay 100 base
+   taels. The 420ms cooldown and earned Qi stop mindless tapping. The
+   once-per-day world technique stays independent.
+
+**Second Wind** is a deliberately generous fail-soft: one seed per drop
+that escapes below the stage with almost no hits is kicked back into the
+field exactly once. It earns one Qi. It does not award money automatically;
+the rebounding pearl still has to strike a real person or structure. Crane
+protects a slightly longer weak opening than Tiger or Monkey.
+
+**Readable strategy:** choosing a draft highlights existing citizens
+compatible with an authored multi-stop route. The lower inspector says
+whether a known route partner is present. The intent is learning the cast
+through experimentation, not reading a 48-entry database before playing.
+
+### Morning writs: an optional objective layer with teeth
+
+Each world owns three independent commissions in `commission_catalog.gd`,
+24 total. A player may accept one before playing the day's two pearls. Its
+counter is advanced by physical events, not by a pretend daily payout: trade
+impacts, drunk contact, route performances, righteous hits, on-beat notes,
+mask changes, wanted encounters, offspring, curse transfers, martial forms,
+poison, remedies, goods, or official judgments. Completion is assessed once
+after the second pearl, rewarding both taels and seals. A failed accepted writ
+adds debt, a controllable risk. A declined writ does nothing. Contract choice,
+progress and outcome are safe-save fields.
+
+### The masked rivals: three escalations across a run
+
+On mornings 5, 10 and 15, an opponent walks into the kinetic field. Each has
+an independent physical collider, its own mask and 4/5/6 health. On-beat
+contacts cause two wounds instead of one. A contact preceded by a second-form
+martial master or third-level building adds a wound; a nearby world technique
+can wound the rival again. The enemy retaliates on each hit, so players must
+choose whether to use scarce daytime tempo to fight or optimize income.
+
+| World | Rival | Retaliation |
+| --- | --- | --- |
+| Dragon Inn | Tax-Eating Eunuch | Seizes silver, shoves the courier away |
+| Monastery | Abbot Who Stole Sound | Curses and silences through downward recoil |
+| Painted Faces | White-Faced Censor | Marks the pearl wanted, swaps lateral direction |
+| Ghost Market | Ninth Debt Ferryman | Issues debt and sends the courier over the bridge |
+| Bamboo Sea | Reed Executioner | Sweeps the pearl violently across the stage |
+| Five Poisons | Venom Registrar | Applies poison and pulls the courier toward the marsh |
+| Red Dunes | Brigand of Seven Tolls | Loads burdens and throws the courier sideways |
+| Celestial Abacus | Auditor of Heaven | Reverses velocity and briefly changes gravity |
+
+Winning pays silver and enough martial seals to advance a cultivated
+household. Ignoring the adversary levies a stage-scaled toll at night. Defeats
+and surviving HP are saved; opponents cannot be erased by reopening a session.
 
 ### A day in the life — emergent example
 
@@ -412,10 +550,15 @@ remain required before a commercial release.
 
 ### Done / not yet done
 
-**Playable now:** all eight boards, physical launch, 48 actors with separate
+**Playable now:** three fighting stances, named-hit Qi building, touch-directed
+midflight parry, bounded bad-luck rescue, route synergy previews; four-step
+touch onboarding and a skip, three escalating
+physics-and-economy mayhem states, reactive comedy stamps and foley, actor
+recoil and reduced-spectacle controls; all eight boards, physical launch, 48 actors with separate
 secret forms, mastery and twelve progressive martial forms (four in each of
 three school paths), martial seal economy, five-level building renovations,
-56 boon laws, post-tribute
+56 boon laws, 36 ordered route performances, 24 daily martial writs, eight
+physical boss opponents appearing three times per run, post-tribute
 drafting, architecture, district oaths, movable households, townsfolk
 animation, rotating street events, eight active martial moves, three-act
 fight choreography, buying, rerolls, statuses, songs, foley, silver economy,
@@ -423,7 +566,7 @@ daily and three-day loops,
 failure/victory, save/resume, world stamps, touch and settings.
 
 **Future polish:** guided tutorial as three diegetic gestures; stronger world
-cutscenes; boss magistrates; further procedural event cards;
+cutscenes; richer phase-based rival move sets; further procedural event cards;
 achievements; physical-device profiling; localized Chinese typography;
 VoiceOver accessibility; iOS signing and TestFlight deployment; balance QA
 with actual human player runs; hand-tuned music mixes; reduced texture memory.
@@ -445,3 +588,11 @@ with actual human player runs; hand-tuned music mixes; reduced texture memory.
     require both a higher seal cost and increased personal practice.
 11. Godot 4.7.2 runs the native scene and eight trajectory tests without
     parse errors. Physical iOS export and ergonomics need independent QA.
+12. The 36 multi-contact recipes are documented, finite, and have repeat
+    caps. Writs update only from real triggers and produce a reward or debt.
+13. Each of eight world rivals can be damaged, defeated, serialized and
+    distinguished by retaliation. Final-day survivors charge an actual toll.
+14. A pinned GitHub Actions pipeline tests native logic and trajectories,
+    exports a genuine single-threaded Godot WebAssembly build, verifies
+    release artifacts and deploys via GitHub Pages. External account
+    configuration and real Safari performance remain separate acceptance gates.

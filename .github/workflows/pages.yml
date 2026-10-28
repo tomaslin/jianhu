@@ -1,0 +1,117 @@
+name: Test, build and publish Jianghu
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-build:
+    name: Native physics tests and single-threaded web build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      XDG_DATA_HOME: ${{ runner.temp }}/jianghu-data
+      XDG_CONFIG_HOME: ${{ runner.temp }}/jianghu-config
+      XDG_CACHE_HOME: ${{ runner.temp }}/jianghu-cache
+    steps:
+      - name: Checkout game source
+        uses: actions/checkout@v4
+
+      - name: Install pinned official Godot 4.7.2 editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/jianghu-godot"
+          curl --fail --location --retry 4 --retry-delay 3 \
+            'https://godot-releases.nbg1.your-objectstorage.com/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip' \
+            --output "$RUNNER_TEMP/jianghu-godot.zip"
+          unzip -q "$RUNNER_TEMP/jianghu-godot.zip" -d "$RUNNER_TEMP/jianghu-godot"
+          GODOT_BIN="$RUNNER_TEMP/jianghu-godot/Godot_v4.7.2-stable_linux.x86_64"
+          chmod +x "$GODOT_BIN"
+          test "$("$GODOT_BIN" --version)" = '4.7.2.stable.official.ed1daf0bf'
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+
+      - name: Install only the official Web export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/extract_web_templates.py extract \
+            "$XDG_DATA_HOME/godot/export_templates/4.7.2.stable"
+          unzip -tq "$XDG_DATA_HOME/godot/export_templates/4.7.2.stable/web_nothreads_release.zip"
+
+      - name: Import source assets
+        run: '"$GODOT_BIN" --headless --path . --editor --import'
+
+      - name: Run the complete content and state-machine suite
+        run: '"$GODOT_BIN" --headless --path . --script res://tests/smoke.gd'
+
+      - name: Run eight-world live physics playtest
+        run: '"$GODOT_BIN" --headless --path . --script res://tests/trajectory.gd'
+
+      - name: Export the actual Godot game to WebAssembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          "$GODOT_BIN" --headless --path . --export-release Web "$GITHUB_WORKSPACE/dist/index.html"
+          cp web/cover.webp dist/cover.webp
+          touch dist/.nojekyll
+          python3 tools/polish_web_export.py dist/index.html
+
+      - name: Validate complete browser release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_web_export.py dist
+          node --check dist/index.js
+          node -e 'const fs=require("fs"); WebAssembly.compile(fs.readFileSync("dist/index.wasm")).then(()=>console.log("Valid WebAssembly")).catch(e=>{console.error(e);process.exitCode=1})'
+
+      - name: Package verified Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify-and-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Deploy the validated build
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public entrypoint and WASM are online
+        shell: bash
+        env:
+          DEPLOYED_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          URL="${DEPLOYED_URL%/}"
+          curl --fail --silent --show-error --location --retry 8 --retry-all-errors --retry-delay 6 \
+            "$URL/index.html" --output "$RUNNER_TEMP/jianghu-deployed.html"
+          grep -Fq 'GODOT_THREADS_ENABLED = false' "$RUNNER_TEMP/jianghu-deployed.html"
+          curl --fail --silent --show-error --location --head --retry 8 --retry-all-errors --retry-delay 6 \
+            "$URL/index.wasm" --output /dev/null
+          echo "Published and verified: $URL"

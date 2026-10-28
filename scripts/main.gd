@@ -9,6 +9,9 @@ const CityStageScript=preload("res://scripts/city_stage.gd")
 const DistrictScript=preload("res://scripts/district_system.gd")
 const BoonCatalog=preload("res://scripts/boon_catalog.gd")
 const ReactionCatalog=preload("res://scripts/reaction_catalog.gd")
+const ChainCatalog=preload("res://scripts/chain_catalog.gd")
+const CommissionCatalog=preload("res://scripts/commission_catalog.gd")
+const RivalScript=preload("res://scripts/rival.gd")
 
 const W:float=390.0
 const H:float=844.0
@@ -24,6 +27,8 @@ var title_font:Font
 var hud:Node2D
 var sound:Node
 var city_stage:Node2D
+var rival:JianghuRival
+var rival_defeated:bool=false
 var rng:=RandomNumberGenerator.new()
 
 var selected_world:int=0
@@ -54,8 +59,26 @@ var cinematic_act:int=0
 var recent_hits:Dictionary={}
 var fly_texts:Array[Dictionary]=[]
 var ink_bursts:Array[Dictionary]=[]
+var comic_stamps:Array[Dictionary]=[]
+var paper_confetti:Array[Dictionary]=[]
+var spectacle_flash:float=0.0
+var mayhem_timer:float=0.0
+var mayhem_tier:int=0
+var mayhem_triggered:Dictionary={}
+var tutorial_stage:int=-1
+var tutorial_hint_timer:float=0.0
+var tutorial_done:bool=false
+var shot_stance:String="crane"
+var qi_charge:int=0
+var qi_spent:int=0
+var qi_cooldown:float=0.0
+var rescue_spent:bool=false
 var technique_used_today:bool=false
 var street_event:int=0
+var known_chains:Dictionary={}
+var chosen_writ:String=""
+var writ_progress:int=0
+var writ_result:String=""
 var training_seals:int=0
 var seals_earned_today:int=0
 
@@ -98,6 +121,7 @@ var music_on:bool=true
 var haptics_on:bool=true
 var reduce_motion:bool=false
 var show_high_contrast:bool=false
+var spectacle_on:bool=true
 
 func _ready() -> void:
     ui_font=load("res://assets/fonts/DejaVuSans.ttf")
@@ -139,8 +163,19 @@ func _notification(what:int) -> void:
 
 func _process(delta:float) -> void:
     elapsed+=delta
+    if tutorial_hint_timer>0:tutorial_hint_timer=maxf(0,tutorial_hint_timer-delta)
     if banner_timer>0.0:banner_timer=maxf(0.0,banner_timer-delta)
     if status_timer>0.0:status_timer=maxf(0.0,status_timer-delta)
+    spectacle_flash=maxf(0.0,spectacle_flash-delta*2.4)
+    for stamp in comic_stamps:
+        stamp.life=float(stamp.life)-delta
+        if not reduce_motion:stamp.pos=Vector2(stamp.pos)+Vector2(0,-27.0*delta)
+    comic_stamps=comic_stamps.filter(func(s):return float(s.life)>0)
+    for confetto in paper_confetti:
+        confetto.life=float(confetto.life)-delta
+        confetto.pos=Vector2(confetto.pos)+Vector2(confetto.vel)*delta
+        confetto.vel=Vector2(confetto.vel)+Vector2(0,170.0*delta)
+    paper_confetti=paper_confetti.filter(func(s):return float(s.life)>0)
     for entry in fly_texts:
         entry.life=float(entry.life)-delta
         entry.pos=Vector2(entry.pos)+Vector2(0,-24*delta)
@@ -150,10 +185,13 @@ func _process(delta:float) -> void:
     ink_bursts=ink_bursts.filter(func(e):return float(e.life)>0.0)
     if hud!=null: hud.queue_redraw()
     if city_stage!=null and phase!="menu":city_stage.queue_redraw()
+    if not reduce_motion and int(elapsed*20.0)!=int((elapsed-delta)*20.0):queue_redraw()
 
 func _physics_process(delta:float) -> void:
     if phase!="dropping":return
     if pause_sim:return
+    qi_cooldown=maxf(0.0,qi_cooldown-delta)
+    mayhem_timer=maxf(0.0,mayhem_timer-delta)
     global_tick+=1
     beat_clock+=delta
     var beat_seconds:float=60.0/float(world_data.bpm)
@@ -205,6 +243,14 @@ func start_dream(index:int, resume:bool=false) -> void:
         actor_trades.clear()
         technique_used_today=false
         street_event=0
+        known_chains.clear()
+        chosen_writ=""
+        writ_progress=0
+        writ_result=""
+        rival_defeated=false
+        shot_stance="crane"
+        tutorial_stage=0 if not tutorial_done else -1
+        tutorial_hint_timer=9.0 if tutorial_stage==0 else 0.0
         training_seals=0
         seals_earned_today=0
     _build_board()
@@ -235,6 +281,8 @@ func _clear_board() -> void:
     for s in board_segments:
         if is_instance_valid(s):s.queue_free()
     board_segments.clear()
+    if rival!=null and is_instance_valid(rival):rival.queue_free()
+    rival=null
     motion_segments.clear()
     board_segment_lines.clear()
     hit_queue.clear()
@@ -242,6 +290,16 @@ func _clear_board() -> void:
     recent_hits.clear()
     fly_texts.clear()
     ink_bursts.clear()
+    comic_stamps.clear()
+    paper_confetti.clear()
+    spectacle_flash=0.0
+    mayhem_timer=0.0
+    mayhem_tier=0
+    mayhem_triggered.clear()
+    qi_charge=0
+    qi_spent=0
+    qi_cooldown=0.0
+    rescue_spent=false
     district_links.clear()
     selected_actor=null
 
@@ -351,6 +409,159 @@ func _rebuild_district() -> void:
     district_links=DistrictScript.rebuild(active_actors)
     if city_stage!=null:city_stage.queue_redraw()
 
+func _advance_tutorial(next_stage:int) -> void:
+    if tutorial_stage<0:return
+    tutorial_stage=next_stage
+    tutorial_hint_timer=9.0
+
+func _finish_tutorial() -> void:
+    tutorial_stage=-1
+    tutorial_hint_timer=0.0
+    tutorial_done=true
+    _save_preferences()
+
+func _comic(at:Vector2,label:String,weight:int=1) -> void:
+    if not spectacle_on:return
+    spectacle_flash=maxf(spectacle_flash,.12*float(weight))
+    if reduce_motion:
+        # Reduced motion retains the information as a single fixed caption.
+        comic_stamps.append({"pos":at,"text":label,"life":.80,"max":.80,"power":1})
+        if comic_stamps.size()>6:comic_stamps.pop_front()
+        return
+    comic_stamps.append({"pos":at,"text":label,"life":1.0+.12*weight,"max":1.0+.12*weight,"power":weight})
+    if comic_stamps.size()>12:comic_stamps.pop_front()
+    var pigments=[Color("#E94A48"),Color("#F2BF42"),Color("#36A6A3"),Color("#E97731"),Color("#D75298")]
+    for i in range(5+weight*6):
+        if paper_confetti.size()>=110:break
+        var angle:float=rng.randf_range(-PI,PI)
+        var speed:float=rng.randf_range(80.0,165.0)+weight*38.0
+        paper_confetti.append({"pos":at,"vel":Vector2(cos(angle),sin(angle))*speed,"life":rng.randf_range(.45,1.15),"color":pigments[rng.randi_range(0,pigments.size()-1)]})
+
+func _whack_caption(actor:JianghuActor) -> String:
+    var nonsense=[
+        ["TEA VIOLENCE!","PAY THE TAB!","ROOFTOP TAX!","BONK!"],
+        ["GONG SHOW!","MONK BONK!","ABBEY RAVE!","DONG!"],
+        ["MASK OFF!","DRAMATIC!","BAD ACTING!","ENCORE!"],
+        ["BOO-NK!","DEAD CREDIT!","GHOOOST!","UNPAID!"],
+        ["WHIP-CRACK!","BAMBOOZLED!","SWISH!","SWORD TAX!"],
+        ["TOXIC TIP!","DOCTOR NO!","SPLORCH!","CURE FEE!"],
+        ["SAND SLAP!","CAMEL UNION!","DELIVERY!","TOLL TROLL!"],
+        ["MATH ATTACK!","AUDIT THIS!","DIVIDE!","TAX BONK!"]
+    ]
+    var words:Array=nonsense[world_index]
+    return str(words[(int(combo_count/4)+actor.activation_count)%words.size()])
+
+func _ignite_mayhem(pearl:JianghuPearl,actor:JianghuActor,tier:int) -> void:
+    if mayhem_triggered.has(str(tier)):return
+    mayhem_triggered[str(tier)]=true
+    mayhem_tier=tier
+    mayhem_timer=4.2+float(tier)*.65
+    var exclamations=[
+        ["THE INN HAS LEARNED PARKOUR!","THE NOODLES DECLARE WAR!","THE EMPEROR OWES A BAR TAB!"],
+        ["THE MONKS INVENT MOSHING!","A BELL SUES ITS ABBOT!","ENLIGHTENMENT IS NOW LOUD!"],
+        ["THE CURTAIN HAS A LAWYER!","EVERY FACE IS WANTED!","THE FINAL ACT EXPLODES!"],
+        ["THE DEAD START A BANK!","THE RIVER GOES BANKRUPT!","GHOSTS EVICT THE LIVING!"],
+        ["THE BAMBOO STARTS A DUEL!","SWORDS NOW GROW ON TREES!","THE FOREST BEATS HEAVEN!"],
+        ["THE SWAMP OPENS A CLINIC!","THE ANTIDOTE GETS POISONED!","THE DOCTOR PRESCRIBES CHAOS!"],
+        ["CAMELS REJECT THE KING!","THE DUNES DEMAND OVERTIME!","THE SILK ROAD EXPLODES!"],
+        ["HEAVEN LOSES ITS RECEIPT!","THE ABACUS JOINS A RIOT!","GRAVITY IS UNDER AUDIT!"]
+    ]
+    var title:String=str(exclamations[world_index][tier-1])
+    banner_text=title
+    banner_timer=2.25
+    _comic(actor.position,"MAYHEM ×%d!"%tier,3)
+    _award(135*tier,actor.position,"jianghu uproar")
+    _grant_training_seals(1,actor.position)
+    # The spectacle is a scoring/trajectory phase, not a cosmetic combo badge.
+    pearl.apply_central_impulse(Vector2(205 if pearl.position.x<195 else -205,-180-tier*60))
+    for companion in active_pearls:
+        if is_instance_valid(companion) and companion!=pearl and not companion.collected:
+            companion.apply_central_impulse(Vector2(rng.randf_range(-165,165),-100-tier*48))
+    if tier==1:
+        _queue_spawn(actor.position+Vector2(0,-19),Vector2(rng.randf_range(-140,140),-160),"paper",pearl.chain_id,"mayhem")
+    elif tier==2:
+        pearl.set_status("blessed",6)
+        _queue_spawn(actor.position+Vector2(0,-22),Vector2(rng.randf_range(-180,180),-210),"copper",pearl.chain_id,"mayhem")
+    else:
+        pearl.world_gravity_timer=2.5
+        for kind in ["iron","paper"]:
+            _queue_spawn(actor.position+Vector2(rng.randf_range(-10,10),-24),Vector2(rng.randf_range(-230,230),-245),kind,pearl.chain_id,"mayhem")
+        debt=maxi(0,debt-90)
+    if sound!=null:sound.play_uproar(tier)
+    if haptics_on:Input.vibrate_handheld(26 if tier<3 else 45)
+
+func _summon_rival() -> void:
+    if rival!=null and is_instance_valid(rival):rival.queue_free()
+    rival=null
+    if day%5!=0 or rival_defeated:return
+    rival=RivalScript.new()
+    rival.configure(self,world_index,int(day/5))
+    add_child(rival)
+    banner_text="AN UNINVITED RIVAL ENTERS THE CITY"
+    banner_timer=2.0
+
+func _hit_rival(pearl:JianghuPearl) -> void:
+    if rival==null or not is_instance_valid(rival) or rival_defeated:return
+    var now:float=Time.get_ticks_msec()/1000.0
+    var key:int=pearl.get_instance_id()
+    if now-float(rival.last_contact.get(key,-10.0))<.23:return
+    rival.last_contact[key]=now
+    var duration:float=60.0/float(world_data.bpm)
+    var tick:float=fmod(beat_clock,duration)
+    var onbeat:bool=minf(tick,duration-tick)<.12
+    var damage:int=2 if onbeat else 1
+    for actor in active_actors:
+        if str(actor.data.id)==pearl.last_actor and (actor.training_rank>=2 or actor.building_level>=3):
+            damage+=1
+            break
+    rival.health=maxi(0,rival.health-damage)
+    rival.pulse=1.0
+    _award(90*damage*rival.stage,rival.position,"rival duel")
+    match str(RivalScript.RIVALS[world_index].move):
+        "audit":
+            treasury=maxi(0,treasury-28*rival.stage)
+            pearl.apply_central_impulse(Vector2(165 if pearl.position.x<195 else -165,-145))
+        "silence":
+            pearl.set_status("cursed",3)
+            pearl.apply_central_impulse(Vector2(0,200))
+        "unmask":
+            pearl.set_status("wanted",7)
+            pearl.linear_velocity.x=-pearl.linear_velocity.x
+        "debt":
+            debt+=25*rival.stage
+            pearl.set_status("cursed",5)
+            pearl.apply_central_impulse(Vector2(220 if pearl.position.x<195 else -220,-75))
+        "shear":pearl.apply_central_impulse(Vector2(320 if pearl.position.x<195 else -320,-125))
+        "venom":
+            pearl.set_status("poison",8)
+            pearl.apply_central_impulse(Vector2(0,165))
+        "burden":
+            pearl.set_status("goods",8)
+            pearl.apply_central_impulse(Vector2(-210 if pearl.position.x<195 else 210,-105))
+        "reversal":
+            pearl.world_gravity_timer=1.5
+            pearl.linear_velocity=Vector2(-pearl.linear_velocity.x,-maxf(140,absf(pearl.linear_velocity.y)))
+    if not reduce_motion:
+        ink_bursts.append({"pos":rival.position,"life":.54,"angle":rng.randf_range(0,TAU)})
+    if rival.health<=0:_defeat_rival()
+    elif onbeat:
+        banner_text="PERFECT PARRY  ·  RIVAL WOUNDED"
+        banner_timer=1.1
+
+func _defeat_rival() -> void:
+    if rival==null or rival_defeated:return
+    var stage:int=rival.stage
+    var name:String=str(RivalScript.RIVALS[world_index].name)
+    _award(370*stage,rival.position,"rival vanquished")
+    _grant_training_seals(2*stage,rival.position)
+    rival_defeated=true
+    _comic(rival.position,"K.O. OFFICIAL!",3)
+    rival.queue_free()
+    rival=null
+    banner_text=name+"  ·  DEFEATED"
+    banner_timer=2.4
+    if sound!=null:sound.play_magic()
+
 func _relocate_actor(actor:JianghuActor,target:Vector2i) -> bool:
     if phase!="build" or actor==null or not is_instance_valid(actor):return false
     if not can_place(target):return false
@@ -394,11 +605,19 @@ func _draw() -> void:
         else:
             var crop_height:float=texture_size.x/target_ratio
             crop=Rect2(0,(texture_size.y-crop_height)*.5,texture_size.x,crop_height)
-        draw_texture_rect_region(world_art,Rect2(0,0,W,H),crop,Color(1,1,1,.85 if phase=="menu" else .58))
+        draw_texture_rect_region(world_art,Rect2(0,0,W,H),crop,Color(1,1,1,.90 if phase=="menu" else .70))
+    _draw_painted_weather()
     if phase=="menu":return
-    # The translucent playfield retains painterly scenery without losing contrast.
-    draw_rect(BOARD_RECT,Color(.97,.95,.87,.28))
-    draw_rect(BOARD_RECT,Color(.21,.23,.20,.74),false,1.2)
+    # The playing area is a translucent *wash* into the scenery. Uneven ink
+    # edges, not an opaque rectangular UI panel, preserve the painting.
+    draw_rect(BOARD_RECT,Color(.97,.95,.87,.38))
+    for side in [BOARD_RECT.position.x,BOARD_RECT.end.x]:
+        var edge=PackedVector2Array()
+        for i in range(21):
+            var y:float=BOARD_RECT.position.y+float(i)*BOARD_RECT.size.y/20.0
+            edge.append(Vector2(side+sin(y*.051+side)*1.5,y))
+        draw_polyline(edge,Color(.22,.24,.19,.25),5.2,true)
+        draw_polyline(edge,Color(.27,.27,.22,.73),1.4,true)
     for i in range(board_segment_lines.size()):
         var segment=board_segment_lines[i]
         var offset=Vector2.ZERO
@@ -415,6 +634,13 @@ func _draw() -> void:
                 var xy=socket_position(socket)
                 draw_arc(xy,17,0,TAU,25,Color(.32,.42,.36,.42),1.25,true)
                 draw_circle(xy,2.1,Color(.31,.42,.36,.66))
+        if selected_offer>=0 and selected_offer<offer_cards.size():
+            var offer_id:String=offer_cards[selected_offer]
+            for resident in active_actors:
+                var possible:Array[String]=[str(resident.data.id)]
+                if ChainCatalog.synergy(offer_id,possible)>0:
+                    var breathing:float=0.0 if reduce_motion else sin(elapsed*5.5+resident.position.x)*2.5
+                    draw_arc(resident.position,29.0+breathing,0,TAU,37,Color(.96,.64,.16,.85),2.7,true)
     if phase=="aim" and not reduce_motion:
         var o=Vector2(launch_x,192)
         var vector=Vector2(sin(aim_angle),cos(aim_angle))
@@ -430,6 +656,36 @@ func _draw() -> void:
         var pos:Vector2=e.pos
         var col=Color(.80,.44,.20,clampf(float(e.life),0,1))
         draw_string(ui_font,pos,str(e.text),HORIZONTAL_ALIGNMENT_CENTER,-1,14,col)
+    # Colored rag-paper shards and flying hand-lettered impact seals are
+    # intentionally more like old kung-fu cinema posters than UI notifications.
+    if spectacle_on and spectacle_flash>0:
+        draw_rect(BOARD_RECT,Color(.98,.72,.31,spectacle_flash*.20))
+        for edge in [34.0,355.0]:
+            draw_line(Vector2(edge,218),Vector2(edge,605),Color(.91,.27,.19,spectacle_flash*.26),3.0,true)
+    if not reduce_motion:
+        for fleck in paper_confetti:
+            var xy:Vector2=fleck.pos
+            if not BOARD_RECT.has_point(xy):continue
+            var pigment:Color=fleck.color
+            pigment.a=clampf(float(fleck.life)*1.5,0,1)
+            draw_line(xy,xy+Vector2(3.5,5),pigment,2.0,true)
+    for stamp in comic_stamps:
+        var at:Vector2=stamp.pos
+        var fade:float=clampf(float(stamp.life)/float(stamp.max),0,1)
+        at.x=clampf(at.x,85,305)
+        at.y=clampf(at.y,250,605)
+        var msg:String=str(stamp.text)
+        var weight:int=int(stamp.power)
+        var text_size:int=13+weight*3
+        var width:float=minf(304.0,maxf(76,float(msg.length())*(8.0+weight*1.0)+23.0))
+        var tint:Color=Color("#E74C3C") if weight>=3 else (Color("#E5A52E") if weight==2 else Color("#31AFA2"))
+        var stamp_poly=PackedVector2Array([at+Vector2(-width*.52,-14),at+Vector2(width*.49,-18),at+Vector2(width*.54,14),at+Vector2(-width*.48,17)])
+        draw_colored_polygon(stamp_poly,Color(tint,fade*.92))
+        draw_polyline(PackedVector2Array([stamp_poly[0],stamp_poly[1],stamp_poly[2],stamp_poly[3],stamp_poly[0]]),Color(.19,.15,.13,fade*.8),2.2,true)
+        if ui_font!=null:
+            var baseline:Vector2=at+Vector2(-ui_font.get_string_size(msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size).x*.5,6)
+            draw_string_outline(ui_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,3,Color(.19,.13,.10,fade))
+            draw_string(ui_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,Color(1,.98,.91,fade))
     if not reduce_motion:
         for burst in ink_bursts:
             var fading:float=clampf(float(burst.life)/.54,0,1)
@@ -439,6 +695,49 @@ func _draw() -> void:
                 var theta=float(i)*TAU/3+float(burst.angle)
                 draw_arc(pos,rad,theta,theta+.60,9,Color(.20,.19,.17,fading*.50),2.6,true)
             draw_circle(pos,4.3,Color.html(str(world_data.accent))*Color(1,1,1,fading*.20))
+
+func _draw_painted_weather() -> void:
+    # Eight different drifting materials put each region inside its painting:
+    # plum blossom, incense, theatre paper, ghost scrip, sword leaves, marsh
+    # spores, dune sand, and gold accounting glyphs. All are independent of
+    # gameplay collisions; reduced-motion mode freezes them in place.
+    var tint:Color=Color.html(str(world_data.accent))
+    var m:String=str(world_data.mechanic)
+    var travel:float=0.0 if reduce_motion else elapsed*(.55+.10*world_index)
+    for i in range(34):
+        var x:float=fposmod(float(i*167+world_index*41)+sin(travel*.38+i*2.1)*22.0,390.0)
+        var y:float=fposmod(float(i*101+world_index*69)+travel*(8.0+i%5*3.0),835.0)
+        var p:Vector2=Vector2(x,y)
+        var in_field:bool=BOARD_RECT.has_point(p)
+        var alpha:float=.16 if in_field else .38
+        if phase=="menu":alpha=.43
+        match m:
+            "trade":
+                var petal=PackedVector2Array([p+Vector2(0,-4),p+Vector2(3,-1),p+Vector2(2,3),p+Vector2(-3,2)])
+                draw_colored_polygon(petal,Color(.70,.38,.32,alpha))
+                draw_line(p,p+Vector2(-2,3),Color(.45,.25,.22,alpha*.75),.6,true)
+            "resonance":
+                draw_arc(p,5.0+float(i%3)*2.0,PI*.7,PI*1.62,13,Color(tint,alpha*.8),1.0,true)
+                draw_circle(p+Vector2(-2,-4),1.3,Color(.86,.87,.76,alpha*.7))
+            "masks":
+                draw_line(p+Vector2(-2,-5),p+Vector2(2,5),Color(.70,.19,.23,alpha),2.0,true)
+                draw_line(p+Vector2(0,-3),p+Vector2(4,1),Color(.94,.76,.43,alpha),1.2,true)
+            "portals":
+                draw_rect(Rect2(p-Vector2(3,6),Vector2(6,12)),Color(.82,.89,.85,alpha*.8))
+                draw_line(p+Vector2(-1,-3),p+Vector2(1,3),Color(.40,.55,.65,alpha),1.1,true)
+            "wind":
+                var leaf=PackedVector2Array([p+Vector2(-8,2),p+Vector2(4,-4),p+Vector2(10,-1),p+Vector2(1,3)])
+                draw_colored_polygon(leaf,Color(.24,.49,.35,alpha*.8))
+                draw_line(p+Vector2(-8,2),p+Vector2(10,-1),Color(.08,.31,.24,alpha),.7,true)
+            "poison":
+                draw_circle(p,1.4+float(i%3),Color(.62,.59,.31,alpha))
+                draw_arc(p,4.0+float(i%3)*2.0,0,TAU,16,Color(tint,alpha*.46),.8,true)
+            "cargo":
+                draw_line(p-Vector2(7,-2),p+Vector2(5,-2),Color(.61,.37,.22,alpha*.7),1.2,true)
+                draw_circle(p+Vector2(5,-2),1.6,Color(.77,.57,.34,alpha))
+            "abacus":
+                draw_line(p+Vector2(-3,-5),p+Vector2(3,5),Color(.73,.54,.28,alpha),1.1,true)
+                draw_line(p+Vector2(-4,1),p+Vector2(4,1),Color(.73,.54,.28,alpha),1.1,true)
 
 func _draw_world_effects() -> void:
     var tint=Color.html(str(world_data.accent))
@@ -493,9 +792,53 @@ func _draw_world_effects() -> void:
                     var y=270.0+bead*67.0+(10 if current_beat%8>=4 else 0)
                     draw_circle(Vector2(x,y),6.0,Color(tint,.20))
 
+func _choose_stance(index:int) -> bool:
+    if phase!="aim" or index<0 or index>2:return false
+    shot_stance=["crane","tiger","monkey"][index]
+    var labels={"crane":"CRANE: STEADY & REACTIVE","tiger":"TIGER: FAST, RICH, IN DEBT","monkey":"MONKEY: MORE PEARLS, LESS PAY"}
+    status_text=str(labels[shot_stance])
+    status_timer=2.0
+    if sound!=null:sound.play_select()
+    save_run()
+    return true
+
+func _qi_flick(at:Vector2) -> bool:
+    if phase!="dropping" or pause_sim or qi_cooldown>0:return false
+    if qi_charge<3:
+        status_text="Build 3 QI by hitting your citizens first"
+        status_timer=.8
+        return false
+    var nearest:JianghuPearl=null
+    var distance:float=10000
+    for pearl in active_pearls:
+        if not is_instance_valid(pearl) or pearl.collected:continue
+        var nearby:float=pearl.position.distance_to(at)
+        if nearby<distance:
+            nearest=pearl
+            distance=nearby
+    if nearest==null or distance>100:
+        status_text="Tap close to a flying pearl to parry"
+        status_timer=.9
+        return false
+    qi_charge-=3
+    qi_spent+=1
+    qi_cooldown=.42
+    var tempo:float=60.0/float(world_data.bpm)
+    var progress:float=fmod(beat_clock,tempo)
+    var onbeat:bool=minf(progress,tempo-progress)<.13
+    var sideways:float=clampf((at.x-nearest.position.x)*2.8,-240,240)
+    nearest.apply_central_impulse(Vector2(sideways,-340 if onbeat else -245))
+    nearest.set_status("blessed",3 if onbeat else 2)
+    if onbeat:_award(100,nearest.position,"perfect qi parry")
+    _comic(nearest.position,"PERFECT PARRY!" if onbeat else "QI SLAP!",2 if onbeat else 1)
+    if sound!=null:sound.play_impact("swords",maxi(4,combo_count),onbeat)
+    if haptics_on:Input.vibrate_handheld(17)
+    return true
+
 func _begin_aim() -> void:
     if phase!="build" and phase!="report":return
     phase="aim"
+    _advance_tutorial(1)
     selected_offer=-1
     launch_x=195.0
     aim_angle=0.0
@@ -507,6 +850,7 @@ func _begin_aim() -> void:
 func _launch() -> void:
     if phase!="aim":return
     phase="dropping"
+    _advance_tutorial(2)
     shot_number+=1
     quiet_time=0.0
     earnings_drop=0
@@ -514,6 +858,13 @@ func _launch() -> void:
     children_this_drop=0
     bell_summoned=false
     cinematic_act=0
+    mayhem_tier=0
+    mayhem_timer=0.0
+    mayhem_triggered.clear()
+    qi_charge=2 if shot_stance=="crane" else (1 if shot_stance=="monkey" else 0)
+    qi_spent=0
+    qi_cooldown=0.0
+    rescue_spent=false
     rhythm_chain=0
     beat_clock=0.0
     last_beat=-1
@@ -523,7 +874,14 @@ func _launch() -> void:
     var variant="jade"
     if world_data.mechanic=="cargo":variant="copper"
     if world_data.mechanic=="portals":variant="paper"
-    _spawn_pearl(Vector2(launch_x,194),Vector2(sin(aim_angle),cos(aim_angle))*120.0,variant,true)
+    var launch_speed:float=205.0 if shot_stance=="tiger" else (132.0 if shot_stance=="monkey" else 120.0)
+    _spawn_pearl(Vector2(launch_x,194),Vector2(sin(aim_angle),cos(aim_angle))*launch_speed,variant,true)
+    if shot_stance=="tiger":
+        debt+=35
+        _comic(Vector2(launch_x,194),"TIGER DEBT!",1)
+    elif shot_stance=="monkey":
+        _queue_spawn(Vector2(clampf(launch_x+18,58,325),205),Vector2(-115,135),"paper",active_pearls[0].chain_id,"monkey accomplice")
+        _comic(Vector2(launch_x,194),"TWO TROUBLEMAKERS!",2)
     drop_started_at=Time.get_ticks_msec()/1000.0
     sound.play_drop()
     queue_redraw()
@@ -550,9 +908,15 @@ func _flush_spawn_queue() -> void:
         var item=spawn_queue.pop_front()
         children_this_drop+=1
         _spawn_pearl(item.pos,item.vel,item.kind,false,item.chain)
+        _record_writ("offspring")
 
 func apply_world_physics(pearl:JianghuPearl,delta:float) -> void:
     if phase!="dropping":return
+    # Recompute physical properties from current states on each tick. Mutating
+    # damp cumulatively made Stone Sandals effectively stop a run in seconds;
+    # leftover cargo mass also persisted after goods were sold.
+    pearl.linear_damp=.05
+    pearl.mass=1.0
     var m:String=str(world_data.mechanic)
     match m:
         "resonance":
@@ -583,7 +947,6 @@ func apply_world_physics(pearl:JianghuPearl,delta:float) -> void:
             if pearl.position.y>400 and pearl.position.y<580:
                 pearl.linear_damp=2.2
                 pearl.apply_central_force(Vector2(sin(beat_clock*3.1)*150,-120))
-            else:pearl.linear_damp=.05
         "cargo":
             pearl.apply_central_force(Vector2(sin(beat_clock*.63)*530.0*pearl.mass,0))
             if pearl.statuses.has("goods"):
@@ -595,6 +958,11 @@ func apply_world_physics(pearl:JianghuPearl,delta:float) -> void:
                 pearl.apply_central_force(Vector2(0,-pearl.mass*1350))
             pearl.apply_central_force(Vector2(sin(beat_clock*1.9)*210,0))
     _apply_boon_motion(pearl,delta)
+    if shot_stance=="crane" and pearl.is_seed and pearl.hits==0:
+        pearl.apply_central_force(Vector2(0,-85.0*pearl.mass))
+    if mayhem_timer>0.0:
+        var swirl:float=sin(beat_clock*(3.0+mayhem_tier)+pearl.position.y*.016)
+        pearl.apply_central_force(Vector2(swirl*170.0*mayhem_tier,-80.0*mayhem_tier)*pearl.mass)
     # Bounded velocity keeps touch trajectories legible under rare multiplier storms.
     if pearl.linear_velocity.length()>780:
         pearl.linear_velocity=pearl.linear_velocity.normalized()*780
@@ -603,6 +971,8 @@ func on_pearl_hit(pearl:JianghuPearl,body:Node) -> void:
     if phase!="dropping" or not is_instance_valid(pearl):return
     if body is JianghuActor:
         hit_queue.append({"pearl":pearl,"actor":body,"tick":global_tick})
+    elif body is JianghuRival:
+        _hit_rival(pearl)
     elif body is StaticBody2D:
         if world_data.mechanic=="cargo" and pearl.statuses.has("goods"):
             _award(12,pearl.position,"cargo slide")
@@ -624,6 +994,7 @@ func _resolve_hit_queue() -> void:
 
 func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
     var id:String=str(actor.data.id)
+    var had_ailment:bool=pearl.statuses.has("poison") or pearl.statuses.has("cursed")
     var old_level:int=ReactionCatalog.mastery_level(actor.activation_count)
     actor.note_hit()
     if not actor.is_peg and seals_earned_today<18 and actor.activation_count%3==0:
@@ -637,9 +1008,14 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
     pearl.hits+=1
     combo_count+=1
     best_combo=maxi(best_combo,combo_count)
+    if combo_count==7:_ignite_mayhem(pearl,actor,1)
+    elif combo_count==17:_ignite_mayhem(pearl,actor,2)
+    elif combo_count==31:_ignite_mayhem(pearl,actor,3)
     var beat_duration:float=60.0/float(world_data.bpm)
     var proximity:float=minf(fmod(beat_clock,beat_duration),beat_duration-fmod(beat_clock,beat_duration))
     var on_beat:bool=proximity<.11
+    if not actor.is_peg:
+        qi_charge=mini(9,qi_charge+(2 if on_beat else 1)+(1 if actor.training_rank>=2 else 0))
     rhythm_chain=rhythm_chain+1 if on_beat else maxi(0,rhythm_chain-1)
     var amount:int=int(actor.data.get("earn",10))
     if actor.is_peg:
@@ -669,12 +1045,22 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
         amount+=_apply_school_form(pearl,actor,on_beat)
         amount=int(round(float(amount)*(1.0+.18*float(new_level)+.16*float(actor.building_level-1))))
     _award(amount,actor.position,id)
+    if not actor.is_peg:
+        pearl.route_history.append(id)
+        if pearl.route_history.size()>5:pearl.route_history.pop_front()
+        if pearl.route_recipes<5:
+            for chain in ChainCatalog.matches(pearl.route_history,pearl.route_completed):
+                if pearl.route_recipes>=5:break
+                _perform_route_chain(pearl,actor,chain)
+        _record_writ_hit(pearl,actor,on_beat,had_ailment)
     if not actor.is_peg and on_beat and rhythm_chain>=4:
         banner_text="THE PERFECT CADENCE   ×%d"%rhythm_chain
         banner_timer=1.05
         if haptics_on:Input.vibrate_handheld(14)
     if not actor.is_peg and sound!=null:
         sound.play_impact(actor.data.kind,combo_count,on_beat)
+    if not actor.is_peg and combo_count%4==0:
+        _comic(actor.position,_whack_caption(actor),1 if combo_count<15 else 2)
     if not actor.is_peg:
         if ink_bursts.size()>32:ink_bursts.pop_front()
         ink_bursts.append({"pos":actor.position,"life":.54,"angle":rng.randf_range(0,TAU)})
@@ -698,6 +1084,61 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
     pearl.consume_statuses()
     if pearl.hits>58:
         _settle_pearl(pearl)
+
+func _perform_route_chain(pearl:JianghuPearl,actor:JianghuActor,chain:Dictionary) -> void:
+    # This is the systemic spectacle: changing the physical order of houses
+    # changes what move a pearl can perform. A recipe is claimable once by
+    # each pearl, with five performances max to bound runaway daughter pearls.
+    var chain_id:String=str(chain.id)
+    if pearl.route_completed.has(chain_id):return
+    pearl.route_completed[chain_id]=true
+    pearl.route_recipes+=1
+    known_chains[chain_id]=true
+    var force:float=float(chain.power)
+    match str(chain.action):
+        "spring":pearl.apply_central_impulse(Vector2(0,-force))
+        "lateral":pearl.apply_central_impulse(Vector2(force if pearl.position.x<195 else -force,-force*.36))
+        "flip":pearl.linear_velocity=Vector2(-pearl.linear_velocity.x,-maxf(200,absf(pearl.linear_velocity.y)))
+        "paper","copper","iron":
+            _queue_spawn(actor.position+Vector2(0,-20),Vector2(rng.randf_range(-175,175),-force),str(chain.action),pearl.chain_id,"route "+chain_id)
+        "drunk":
+            pearl.set_status("drunk",7)
+            pearl.apply_central_impulse(Vector2(0,-force))
+        "blessing":
+            pearl.set_status("blessed",8)
+            pearl.apply_central_impulse(Vector2(0,-force))
+        "ambush":
+            pearl.set_status("wanted",8)
+            pearl.apply_central_impulse(Vector2(force if pearl.position.x<195 else -force,-120))
+        "cargo":
+            pearl.set_status("goods",9)
+            pearl.apply_central_impulse(Vector2(force if pearl.position.x<195 else -force,-60))
+        "spirit":
+            pearl.set_status("cursed",7)
+            pearl.apply_central_impulse(Vector2(0,-force))
+        "exorcise":
+            pearl.statuses.erase("poison")
+            pearl.statuses.erase("cursed")
+            debt=maxi(0,debt-int(force))
+            pearl.apply_central_impulse(Vector2(0,-force))
+        "teleport":
+            pearl.position=Vector2(clampf(390.0-pearl.position.x,43,347),clampf(pearl.position.y-40,218,597))
+            pearl.teleport_cooldown=1.0
+        "rain":
+            for child in active_pearls:
+                if is_instance_valid(child) and not child.collected:
+                    child.apply_central_impulse(Vector2(rng.randf_range(-force,force),-force*.7))
+    _award(int(chain.silver),actor.position,"secret route")
+    _record_writ("route")
+    if chain.steps.size()>=3:_grant_training_seals(2,actor.position)
+    else:_grant_training_seals(1,actor.position)
+    if ink_bursts.size()>32:ink_bursts.pop_front()
+    ink_bursts.append({"pos":actor.position,"life":.54,"angle":rng.randf_range(0,TAU)})
+    banner_text=str(chain.name)
+    banner_timer=2.1
+    _comic(actor.position,"SECRET MOVE!",3)
+    if sound!=null:sound.play_magic()
+    if haptics_on:Input.vibrate_handheld(20)
 
 func _choreograph_fight(pearl:JianghuPearl) -> void:
     # A brush-stroke three-act wuxia action phrase, not a passive milestone.
@@ -738,6 +1179,7 @@ func _choreograph_fight(pearl:JianghuPearl) -> void:
     ink_bursts.append({"pos":pearl.position,"life":.54,"angle":rng.randf_range(0,TAU)})
     banner_text=line
     banner_timer=1.65
+    _comic(pearl.position,"KUNG FU!",3)
     if sound!=null:sound.play_impact("swords",combo_count,true)
 
 func _apply_oath_rules(pearl:JianghuPearl,actor:JianghuActor,base_amount:int,on_beat:bool) -> int:
@@ -860,6 +1302,7 @@ func _train_actor(actor:JianghuActor,school:String) -> bool:
     actor.discipline=school
     actor.training_rank+=1
     actor.queue_redraw()
+    _comic(actor.position,"KUNG FU +1!",2)
     banner_text="%s SCHOOL · FORM %d / 4"%[school.to_upper(),actor.training_rank]
     banner_timer=1.8
     sound.play_place()
@@ -879,6 +1322,7 @@ func _upgrade_building(actor:JianghuActor) -> bool:
         return false
     treasury-=cost
     actor.grow_building(actor.building_level+1)
+    _comic(actor.position,"HIGHER RENT!",2)
     banner_text="%s · %d-STOREY LEGEND"%[str(actor.data.name).to_upper(),actor.building_level]
     banner_timer=2.0
     sound.play_place()
@@ -1228,6 +1672,15 @@ func _invoke_technique() -> bool:
             chosen.world_gravity_timer=1.7
             chosen.linear_velocity=-chosen.linear_velocity*.8+Vector2(0,-300)*force
             chosen.set_status("blessed",4)
+    # A well-aimed martial intervention can break a rival's stance. This makes
+    # the daily technique a tactical resource during every fifth-day duel.
+    if rival!=null and is_instance_valid(rival) and not rival_defeated and chosen.position.distance_to(rival.position)<115:
+        rival.health=maxi(0,rival.health-(2 if onbeat else 1))
+        rival.pulse=1.0
+        if rival.health==0:_defeat_rival()
+        else:
+            banner_text="MARTIAL COUNTERSTRIKE"
+            banner_timer=1.3
     _award(235 if onbeat else 95,chosen.position,"martial intervention")
     ink_bursts.append({"pos":chosen.position,"life":.54,"angle":rng.randf_range(0,TAU)})
     banner_text=str(world_data.technique)+( "  ·  PERFECT BEAT" if onbeat else "")
@@ -1241,7 +1694,7 @@ func _award(amount:int,at:Vector2,reason:String) -> void:
     if amount<=0:return
     # Renown lifts the economy as tribute requirements escalate. The combo
     # supplement rewards complicated bounce routes without replacing physics.
-    amount=int(round(float(amount)*(1.0+float(day-1)*.18)*(1.0+float(mini(combo_count,25))*.019)))
+    amount=int(round(float(amount)*(1.0+float(day-1)*.18)*(1.0+float(mini(combo_count,25))*.019)*(1.0+float(mayhem_tier)*.12 if mayhem_timer>0 else 1.0)*(1.28 if phase=="dropping" and shot_stance=="tiger" else (.78 if phase=="dropping" and shot_stance=="monkey" else 1.0))))
     treasury+=amount
     total_earned+=amount
     earnings_today+=amount
@@ -1253,6 +1706,18 @@ func _award(amount:int,at:Vector2,reason:String) -> void:
 
 func _settle_pearl(pearl:JianghuPearl) -> void:
     if not is_instance_valid(pearl):return
+    # A dreadful first bounce deserves a second punchline. This once-per-drop
+    # physical rescue cannot be farmed and never activates on rich cascades.
+    var rescue_hits:int=3 if shot_stance=="crane" else 1
+    if phase=="dropping" and pearl.is_seed and not pearl.collected and not rescue_spent and pearl.hits<=rescue_hits and pearl.position.y>BOARD_RECT.end.y+12:
+        rescue_spent=true
+        pearl.position=Vector2(clampf(pearl.position.x,76,314),433)
+        pearl.linear_velocity=Vector2(-165 if pearl.position.x>195 else 165,-305)
+        pearl.born_at=Time.get_ticks_msec()/1000.0
+        qi_charge=mini(9,qi_charge+1)
+        _comic(pearl.position,"SECOND WIND!",2)
+        if sound!=null:sound.play_magic()
+        return
     pearl.collected=true
     active_pearls.erase(pearl)
     if pearl.hits>3 and pearl.is_seed:
@@ -1264,8 +1729,10 @@ func _end_drop() -> void:
     _set_pause(false)
     fast_speed=false
     Engine.time_scale=1.0
+    mayhem_timer=0.0
     if shot_number<2:
         phase="aim"
+        _advance_tutorial(1)
         status_text="First pearl earned %s taels"%short_money(earnings_drop)
         status_timer=2.0
         banner_text="ONE MORE PEARL"
@@ -1273,17 +1740,23 @@ func _end_drop() -> void:
         save_run()
     else:
         phase="report"
+        _advance_tutorial(3)
+        var writ_line:String=_close_writ()
+        if rival!=null and not rival_defeated:
+            debt+=int(rival.stage)*120
+            if writ_line=="":writ_line="THE UNDEFEATED RIVAL LEVIES A TOLL"
         if debt>0:
             var paid=mini(treasury,debt)
             treasury-=paid
             debt-=paid
-        banner_text="THE LEDGER REMEMBERS"
+        banner_text=writ_line if writ_line!="" else "THE LEDGER REMEMBERS"
         banner_timer=1.7
         save_run()
     sound.on_settle()
     queue_redraw()
 
 func _next_day() -> void:
+    if tutorial_stage==3:_finish_tutorial()
     if day%3==0:
         phase="tribute"
     else:
@@ -1298,11 +1771,16 @@ func _advance_day() -> void:
     earnings_today=0
     technique_used_today=false
     seals_earned_today=0
+    chosen_writ=""
+    writ_progress=0
+    writ_result=""
+    rival_defeated=false
     street_event=(day-1)%3
     offer_cards=Catalog.offers(world_index,owned_ids,rng)
     selected_offer=-1
     actor_trades.clear()
     phase="build"
+    _summon_rival()
     if boons.has("tea_endowment"):_award(100,Vector2(195,220),"tea endowment")
     if boons.has("abbey_endowment"):
         var orthodox:int=0
@@ -1330,6 +1808,7 @@ func _pay_tribute() -> void:
         sound.on_loss()
         return
     treasury-=owed
+    _comic(Vector2(195,400),"BRIBE ACCEPTED!",2)
     sound.on_tribute()
     if day>=15:
         phase="victory"
@@ -1348,6 +1827,7 @@ func _choose_boon(index:int) -> void:
     var boon_id:String=boon_cards[index]
     if boons.has(boon_id):return
     boons.append(boon_id)
+    _comic(Vector2(195,410),"LAW BROKEN!",3)
     if boon_id=="debt_amnesty":debt=int(debt*.5)
     var label=str(BoonCatalog.boon(boon_id).name)
     boon_cards.clear()
@@ -1394,10 +1874,61 @@ func _purchase_actor(actor_id:String,socket:Vector2i) -> bool:
     if not _place_actor(actor_id,socket):return false
     treasury-=cost
     builds_today+=1
+    _comic(socket_position(socket),"NEW TROUBLE!",2)
     return true
 
 func build_limit() -> int:
     return 3 if boons.has("extra_permit") else 2
+
+func _choose_writ(index:int) -> bool:
+    if phase!="build" or chosen_writ!="":return false
+    var choices:Array[Dictionary]=CommissionCatalog.for_world(world_index)
+    if index<0 or index>=choices.size():return false
+    chosen_writ=str(choices[index].id)
+    writ_progress=0
+    writ_result=""
+    status_text="Accepted: "+str(choices[index].name)
+    status_timer=2.0
+    sound.play_select()
+    save_run()
+    return true
+
+func _record_writ(event_kind:String,amount:int=1) -> void:
+    if chosen_writ=="" or writ_result!="":return
+    var data:Dictionary=CommissionCatalog.writ(chosen_writ)
+    if data.is_empty() or str(data.kind)!=event_kind:return
+    var target:int=CommissionCatalog.target_for(chosen_writ,day)
+    if event_kind=="combo":writ_progress=maxi(writ_progress,mini(target,amount))
+    else:writ_progress=mini(target,writ_progress+amount)
+
+func _record_writ_hit(pearl:JianghuPearl,actor:JianghuActor,onbeat:bool,had_ailment:bool) -> void:
+    if chosen_writ=="":return
+    _record_writ("named")
+    _record_writ("combo",combo_count)
+    if onbeat:_record_writ("onbeat")
+    for tag in actor.data.tags:
+        _record_writ(str(tag))
+    if pearl.statuses.has("drunk"):_record_writ("drunk")
+    if pearl.statuses.has("wanted"):_record_writ("wanted")
+    if pearl.statuses.has("cursed"):_record_writ("cursed")
+    if pearl.statuses.has("poison"):_record_writ("poison")
+    if pearl.statuses.has("goods"):_record_writ("goods")
+    if had_ailment and str(actor.data.id) in ["physician","gourd","relic"]:
+        _record_writ("cure")
+
+func _close_writ() -> String:
+    if chosen_writ=="" or writ_result!="":return ""
+    var goal:int=CommissionCatalog.target_for(chosen_writ,day)
+    if writ_progress>=goal:
+        writ_result="completed"
+        _comic(Vector2(195,365),"BONUS PAID!",2)
+        _award(CommissionCatalog.reward_for(chosen_writ,day),Vector2(195,200),"completed writ")
+        _grant_training_seals(int(CommissionCatalog.writ(chosen_writ).seals),Vector2(195,200))
+        return "THE MARTIAL COMMISSION IS HONORED"
+    writ_result="failed"
+    _comic(Vector2(195,365),"HERE'S YOUR BILL!",1)
+    debt+=CommissionCatalog.risk_for(day)
+    return "THE COMMISSIONER SENDS A BILL"
 
 func purchase_cost(actor_id:String) -> int:
     var data:Dictionary=Catalog.actor(actor_id)
@@ -1451,6 +1982,10 @@ func _input(event:InputEvent) -> void:
             elif phase!="menu":phase="menu"
 
 func _press_at(pos:Vector2) -> void:
+    if tutorial_stage>=0 and tutorial_hint_timer>0 and Rect2(282,209,79,47).has_point(pos):
+        _finish_tutorial()
+        queue_redraw()
+        return
     if phase=="menu":
         if Rect2(292,546,68,76).has_point(pos):
             selected_world=(selected_world+1)%8
@@ -1471,6 +2006,7 @@ func _press_at(pos:Vector2) -> void:
         elif Rect2(39,355,315,66).has_point(pos):haptics_on=!haptics_on
         elif Rect2(39,430,315,66).has_point(pos):reduce_motion=!reduce_motion
         elif Rect2(39,505,315,66).has_point(pos):show_high_contrast=!show_high_contrast
+        elif Rect2(39,580,315,66).has_point(pos):spectacle_on=!spectacle_on
         _save_preferences()
         if sound!=null:sound.set_music_enabled(music_on)
     elif phase=="build":
@@ -1485,6 +2021,8 @@ func _press_at(pos:Vector2) -> void:
                     _train_actor(selected_actor,["righteous","rogue","wanderer"][choice])
                 elif selected_actor.training_rank>0 and Rect2(113,583,240,51).has_point(pos):
                     _train_actor(selected_actor,selected_actor.discipline)
+        elif selected_offer==-1 and selected_actor==null and chosen_writ=="" and Rect2(35,589,322,50).has_point(pos):
+            _choose_writ(clampi(int((pos.x-35)/108),0,2))
         elif Rect2(285,762,88,47).has_point(pos):
             _begin_aim()
         elif Rect2(16,762,107,47).has_point(pos):
@@ -1521,6 +2059,9 @@ func _press_at(pos:Vector2) -> void:
     elif phase=="aim":
         if Rect2(42,756,306,51).has_point(pos):
             _launch()
+        elif Rect2(24,596,336,48).has_point(pos):
+            var choice:int=clampi(int((pos.x-24)/114),0,2)
+            if Rect2(24+choice*114,596,107,48).has_point(pos):_choose_stance(choice)
         elif Rect2(35,674,321,38).has_point(pos):
             launch_x=clampf(pos.x,48,342)
         elif Rect2(35,719,321,34).has_point(pos):
@@ -1535,6 +2076,8 @@ func _press_at(pos:Vector2) -> void:
         elif Rect2(31,65,62,51).has_point(pos):
             fast_speed=!fast_speed
             Engine.time_scale=1.55 if fast_speed else 1.0
+        elif BOARD_RECT.has_point(pos):
+            _qi_flick(pos)
     elif phase=="report":
         if Rect2(40,755,310,55).has_point(pos):_next_day()
         elif BOARD_RECT.has_point(pos):selected_actor=_actor_at(pos)
@@ -1559,6 +2102,8 @@ func _drag_at(pos:Vector2) -> void:
             launch_x=clampf(pos.x,48,342)
         elif drag_origin.y>=718 and drag_origin.y<756:
             aim_angle=clampf((pos.x-195.0)/160.0,-1.0,1.0)*.68
+        elif drag_origin.y>=596 and drag_origin.y<653:
+            pass
         elif BOARD_RECT.has_point(drag_origin):
             aim_angle=clampf((pos.x-launch_x)/220.0,-1.0,1.0)*.68
     queue_redraw()
@@ -1590,7 +2135,7 @@ func save_run() -> void:
     for actor in active_actors:
         if not is_instance_valid(actor):continue
         placements.append({"id":actor.data.id,"col":actor.socket.x,"row":actor.socket.y,"activations":actor.activation_count,"discipline":actor.discipline,"training_rank":actor.training_rank,"building_level":actor.building_level})
-    var save={"format":5,"world":world_index,"seed":seed_value,"day":day,"shot":shot_number,"builds_today":builds_today,"treasury":treasury,"gross":total_earned,"earnings_today":earnings_today,"debt":debt,"boons":boons,"boon_cards":boon_cards,"technique_used":technique_used_today,"street_event":street_event,"training_seals":training_seals,"seals_earned_today":seals_earned_today,"phase":phase,"placements":placements,"offers":offer_cards,"flags":run_flags,"launch_x":launch_x,"aim_angle":aim_angle}
+    var save={"format":9,"world":world_index,"seed":seed_value,"day":day,"shot":shot_number,"stance":shot_stance,"builds_today":builds_today,"treasury":treasury,"gross":total_earned,"earnings_today":earnings_today,"debt":debt,"boons":boons,"boon_cards":boon_cards,"technique_used":technique_used_today,"street_event":street_event,"training_seals":training_seals,"seals_earned_today":seals_earned_today,"phase":phase,"placements":placements,"offers":offer_cards,"flags":run_flags,"known_chains":known_chains,"chosen_writ":chosen_writ,"writ_progress":writ_progress,"writ_result":writ_result,"rival_hp":rival.health if rival!=null and is_instance_valid(rival) else 0,"rival_defeated":rival_defeated,"launch_x":launch_x,"aim_angle":aim_angle}
     var file=FileAccess.open(SAVE_PATH,FileAccess.WRITE)
     if file!=null:file.store_string(JSON.stringify(save))
 
@@ -1599,13 +2144,15 @@ func restore_run() -> void:
     var file=FileAccess.open(SAVE_PATH,FileAccess.READ)
     if file==null:return
     var json=JSON.parse_string(file.get_as_text())
-    if not json is Dictionary or int(json.get("format",0)) not in [2,3,4,5]:return
+    if not json is Dictionary or int(json.get("format",0)) not in [2,3,4,5,6,7,8,9]:return
     _clear_board()
     _refresh_world(int(json.get("world",0)))
     selected_world=world_index
     seed_value=int(json.get("seed",99))
     rng.seed=seed_value
     day=int(json.get("day",1))
+    shot_stance=str(json.get("stance","crane"))
+    if shot_stance not in ["crane","tiger","monkey"]:shot_stance="crane"
     shot_number=int(json.get("shot",0))
     builds_today=int(json.get("builds_today",0))
     treasury=int(json.get("treasury",0))
@@ -1617,6 +2164,11 @@ func restore_run() -> void:
     training_seals=int(json.get("training_seals",0))
     seals_earned_today=int(json.get("seals_earned_today",0))
     run_flags=json.get("flags",{})
+    known_chains=json.get("known_chains",{})
+    chosen_writ=str(json.get("chosen_writ",""))
+    writ_progress=int(json.get("writ_progress",0))
+    writ_result=str(json.get("writ_result",""))
+    rival_defeated=bool(json.get("rival_defeated",false))
     boons.clear()
     for boon_id in json.get("boons",[]):boons.append(str(boon_id))
     boon_cards.clear()
@@ -1632,11 +2184,17 @@ func restore_run() -> void:
             active_actors[-1].grow_building(int(item.get("building_level",1)))
             active_actors[-1].queue_redraw()
     _rebuild_district()
+    _summon_rival()
+    if rival!=null and int(json.get("rival_hp",0))>0:
+        rival.health=mini(rival.max_health,int(json.get("rival_hp",rival.max_health)))
     offer_cards.clear()
     for card in json.get("offers",[]):offer_cards.append(str(card))
     launch_x=float(json.get("launch_x",195.0))
     aim_angle=float(json.get("aim_angle",0.0))
     phase=str(json.get("phase","build"))
+    if not tutorial_done:
+        tutorial_stage=0 if phase=="build" else (1 if phase=="aim" else 3)
+        tutorial_hint_timer=8.0
     inspect_mode="home"
     if phase!="build" and phase!="aim" and phase!="report" and phase!="tribute" and phase!="boon":phase="build"
     sound.change_world(world_index)
@@ -1655,6 +2213,8 @@ func _load_preferences() -> void:
     haptics_on=bool(config.get_value("touch","haptics",true))
     reduce_motion=bool(config.get_value("visual","reduced_motion",false))
     show_high_contrast=bool(config.get_value("visual","high_contrast",false))
+    spectacle_on=bool(config.get_value("visual","spectacle",true))
+    tutorial_done=bool(config.get_value("progress","tutorial_done",false))
     world_stamps=config.get_value("progress","world_stamps",{})
 
 func _save_preferences() -> void:
@@ -1663,6 +2223,8 @@ func _save_preferences() -> void:
     config.set_value("touch","haptics",haptics_on)
     config.set_value("visual","reduced_motion",reduce_motion)
     config.set_value("visual","high_contrast",show_high_contrast)
+    config.set_value("visual","spectacle",spectacle_on)
+    config.set_value("progress","tutorial_done",tutorial_done)
     config.set_value("progress","world_stamps",world_stamps)
     config.save("user://jianghu_settings.cfg")
 

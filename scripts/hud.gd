@@ -102,7 +102,7 @@ func _draw_menu() -> void:
     _text("DREAMING OF",195,91,17,ink(),true,true)
     _text("JIANGHU",195,151,46,ink(),true,true)
     _rule(88,166,214)
-    _text("A BALLAD IN EIGHT SCROLLS",195,182,11,ink(),true)
+    _text("EIGHT SCROLLS  ·  ONE TERRIBLE ACCOUNTANT",195,182,11,ink(),true)
 
     _panel(Rect2(20,429,350,222),.89)
     _text("SCROLL  %02d / 08"%(main.selected_world+1),195,464,12,accent(),true)
@@ -121,7 +121,7 @@ func _draw_menu() -> void:
     _button(Rect2(49,682,292,60),"OPEN THIS SCROLL",true,true,19)
     if FileAccess.file_exists(main.SAVE_PATH):
         _button(Rect2(82,752,226,49),"CONTINUE DREAM",false,true,15)
-    else:_text("TOUCH  ·  AIM  ·  LET THE PEARL FALL",195,785,11,ink(),true)
+    else:_text("HIT HARD  ·  MAKE TROUBLE  ·  PAY TAXES",195,785,11,ink(),true)
     _button(Rect2(328,49,45,44),"⚙",false,true,18)
 
 func _draw_status() -> void:
@@ -131,7 +131,10 @@ func _draw_status() -> void:
         _text("DAY %02d / 15  ·  SHOT %d / 2"%[main.day,main.shot_number],195,66,11,ink(),true)
         _text(main.short_money(main.treasury)+" TAELS",195,104,23,accent(),true,true)
         _text("TRIBUTE  %s"%main.short_money(main.current_tribute()),195,127,12,ink(),true)
-        _text(main.event_name().to_upper()+"   ·   %d MARTIAL SEALS"%main.training_seals,195,150,10,accent(),true)
+        if main.rival!=null and is_instance_valid(main.rival) and not main.rival_defeated:
+            _text("DUEL  ·  %s   %d/%d"%[str(main.RivalScript.RIVALS[main.world_index].name),main.rival.health,main.rival.max_health],195,150,9,Color("#9D4037"),true)
+        else:
+            _text(main.event_name().to_upper()+"   ·   %d MARTIAL SEALS"%main.training_seals,195,150,10,accent(),true)
         return
     _text(str(main.world_data.name).to_upper(),20,66,12,accent())
     _text("DAY %02d / 15"%main.day,20,91,15,ink())
@@ -141,7 +144,12 @@ func _draw_status() -> void:
     var due:int=main.current_tribute()
     _right_text("TRIBUTE  %s"%main.short_money(due),368,118,13,ink())
     _rule(20,129,349)
-    _text(main.event_name().to_upper(),20,145,11,accent())
+    if main.rival!=null and is_instance_valid(main.rival) and not main.rival_defeated:
+        _text("RIVAL  ·  "+str(main.RivalScript.RIVALS[main.world_index].name),20,145,10,Color("#9D4037"))
+        for pip in range(main.rival.max_health):
+            draw_circle(Vector2(308+pip*13,145),4.0,accent() if pip<main.rival.health else Color(ink(),.18))
+    else:
+        _text(main.event_name().to_upper(),20,145,11,accent())
     _text("%d OATHS   ·   %d BOONS   ·   %d MARTIAL SEALS"%[main.district_links.size(),main.boons.size(),main.training_seals],20,160,10,ink())
     var r:float=fmod(main.beat_clock,60.0/float(main.world_data.bpm))/(60.0/float(main.world_data.bpm))
     var dot_col:Color=accent() if r<.18 else Color(ink(),.22)
@@ -169,32 +177,71 @@ func _draw_build() -> void:
     if main.selected_offer>=0 and main.selected_offer<main.offer_cards.size():
         var chosen=main.Catalog.actor(main.offer_cards[main.selected_offer])
         _panel(Rect2(36,588,318,61),.96)
-        _text(str(chosen.name),195,610,15,ink(),true)
+        _text(str(chosen.name),195,606,14,ink(),true)
         var cost=main.purchase_cost(str(chosen.id))
-        _text("Tap an empty ring · %d taels"%cost if main.treasury>=cost else "Earn silver first · tap PLAY to launch",195,634,13,accent(),true)
+        var potential:int=main.ChainCatalog.synergy(str(chosen.id),main.owned_ids)
+        _text("SECRET ROUTE PARTNER NEARBY!" if potential>0 else "NO KNOWN ROUTE PARTNER YET",195,623,10,Color("#A66016") if potential>0 else ink(),true)
+        _text("Tap an empty ring · %d taels"%cost if main.treasury>=cost else "Earn silver first · tap PLAY to launch",195,643,12,accent(),true)
     elif main.selected_actor!=null and is_instance_valid(main.selected_actor):
         _draw_actor_inspect()
-    elif main.day==1 and main.treasury==0:
-        _text("The founding three are free. PLAY earns silver.",195,643,12,ink(),true)
+    elif main.chosen_writ=="":
+        _panel(Rect2(28,562,334,87),.97)
+        _text("ACCEPT ONE OPTIONAL MARTIAL WRIT  ·  FAILURE INCURS DEBT",195,582,9,accent(),true)
+        var writs=main.CommissionCatalog.for_world(main.world_index)
+        for i in range(writs.size()):
+            _button(Rect2(35+i*108,589,104,50),str(writs[i].short),false,true,11)
+    elif main.chosen_writ!="":
+        var writ=main.CommissionCatalog.writ(main.chosen_writ)
+        _panel(Rect2(28,586,334,63),.97)
+        _text("WRIT  ·  "+str(writ.name),195,610,12,accent(),true)
+        _text("%d / %d  ·  REWARD %d TAELS  ·  RISK %d"%[main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day),main.CommissionCatalog.reward_for(main.chosen_writ,main.day),main.CommissionCatalog.risk_for(main.day)],195,632,11,ink(),true)
     else:
         _text("Place people. Build streets. Make trouble.",195,643,12,ink(),true)
 
 func _draw_aim() -> void:
+    _panel(Rect2(14,548,362,104),.95)
+    _text("CHOOSE YOUR FIGHTING STANCE",195,566,12,accent(),true)
+    var styles=["crane","tiger","monkey"]
+    var descriptions=["CRANE  ·  2 STARTING QI & SECOND WIND","TIGER  ·  +28% TAELS, 35 DEBT PER PEARL","MONKEY  ·  BONUS PEARL, -22% PAYOUT"]
+    var chosen:int=styles.find(main.shot_stance)
+    _text(str(descriptions[maxi(0,chosen)]),195,586,11,ink(),true)
+    for i in range(3):
+        var selected:bool=main.shot_stance==str(styles[i])
+        var r:Rect2=Rect2(24+i*114,596,107,48)
+        _button(r,str(styles[i]).to_upper(),selected,true,14)
+        if selected:draw_rect(r.grow(2),Color("#E8AF41"),false,2.0)
     _panel(Rect2(12,656,366,163),.965)
-    _text("TRACE A COURSE THROUGH FATE",195,672,12,accent(),true)
+    if main.chosen_writ!="":
+        var writ=main.CommissionCatalog.writ(main.chosen_writ)
+        _text("WRIT · %s  %d/%d"%[str(writ.short),main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day)],195,672,12,accent(),true)
+    else:_text("TRACE A COURSE THROUGH FATE",195,672,12,accent(),true)
     _text("ENTRY",23,698,11,ink())
     _rule(90,691,258)
     draw_circle(Vector2(main.launch_x,691),9,accent())
     _text("ANGLE",23,743,11,ink())
     _rule(90,737,258)
     draw_circle(Vector2(195+main.aim_angle/.68*160,737),9,accent())
-    _button(Rect2(42,756,306,51),"RELEASE THE PEARL",true,true,17)
+    _button(Rect2(42,756,306,51),"LET THE PEARL FLY!",true,true,17)
 
 func _draw_dropping() -> void:
+    _panel(Rect2(46,590,298,62),.94)
+    _text("QI  %d / 9   ·   TAP A PEARL TO PARRY"%main.qi_charge,195,611,13,accent(),true)
+    _text("COSTS 3 QI  ·  ON-BEAT PARRIES PAY",195,630,10,ink(),true)
+    for dot in range(9):
+        draw_circle(Vector2(140+dot*14,641),4,accent() if dot<main.qi_charge else Color(ink(),.16))
     _panel(Rect2(14,658,362,158),.88)
-    _text("THE PEARL IS TRAVELLING",195,682,15,ink(),true,true)
+    if main.chosen_writ!="":
+        var writ=main.CommissionCatalog.writ(main.chosen_writ)
+        _text("WRIT  ·  %s   %d/%d"%[str(writ.short),main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day)],195,682,14,ink(),true,true)
+    else:_text("JIANGHU IS GETTING OUT OF HAND",195,682,15,ink(),true,true)
     _text("+ %s  TAELS"%main.short_money(main.earnings_drop),195,719,26,accent(),true,true)
-    _text("COMBO %d  ·  RHYTHM %d  ·  %d OATHS"%[main.combo_count,main.rhythm_chain,main.district_links.size()],195,745,12,ink(),true)
+    if main.mayhem_timer>0:
+        _text("MAYHEM ×%d  ·  COMBO %d  ·  BONUS %d%%"%[main.mayhem_tier,main.combo_count,main.mayhem_tier*12],195,743,12,Color("#C44230"),true)
+    else:_text("COMBO %d  ·  RHYTHM %d  ·  %d OATHS"%[main.combo_count,main.rhythm_chain,main.district_links.size()],195,743,12,ink(),true)
+    for i in range(12):
+        var lit:bool=float(i)<float(main.combo_count)/31.0*12.0 or (main.mayhem_timer>0 and i<main.mayhem_tier*4)
+        var segment=Rect2(38+i*26.0,750,20,4.0)
+        draw_rect(segment,Color("#F0B835") if lit else Color(ink(),.12))
     _button(Rect2(35,759,320,48),str(main.world_data.technique)+"  ·  1 / DAY" if not main.technique_used_today else "TECHNIQUE SPENT  ·  NEXT MORNING",true,not main.technique_used_today,12)
     _button(Rect2(31,65,62,51),"1.5×" if main.fast_speed else "1×",false,true,14)
     _button(Rect2(309,65,63,51),"▶" if main.pause_sim else "Ⅱ",false,true,18)
@@ -205,15 +252,16 @@ func _draw_dropping() -> void:
 
 func _draw_report() -> void:
     _panel(Rect2(28,653,334,163),.96)
-    _text("THIS DAY'S CHRONICLE",195,681,18,ink(),true,true)
+    _text("DAILY DAMAGE REPORT",195,681,18,ink(),true,true)
     _text("+ %s  taels earned"%main.short_money(main.earnings_today),195,713,20,accent(),true)
-    _text("Treasury  %s"%main.short_money(main.treasury),195,744,13,ink(),true)
+    var writ_suffix="  ·  WRIT "+("✓" if main.writ_result=="completed" else "×") if main.chosen_writ!="" else ""
+    _text("Treasury  %s%s"%[main.short_money(main.treasury),writ_suffix],195,744,13,ink(),true)
     _button(Rect2(40,755,310,55),"TURN THE PAGE  ›",true,true,17)
 
 func _draw_tribute() -> void:
     _panel(Rect2(28,487,334,325),.97)
     _text("THE RED LEDGER",195,527,27,ink(),true,true)
-    _text("The magistrate asks for his silver.",195,553,13,ink(),true)
+    _text("The magistrate has brought a calculator.",195,553,13,ink(),true)
     _rule(71,569,248)
     _text("OWED",195,595,11,ink(),true)
     _text("%s  taels"%main.short_money(main.current_tribute()),195,628,26,accent(),true)
@@ -225,7 +273,7 @@ func _draw_tribute() -> void:
 
 func _draw_boon() -> void:
     _panel(Rect2(20,342,350,468),.97)
-    _text("THREE FAVORS OF JIANGHU",195,384,22,ink(),true,true)
+    _text("STEAL ONE LAW OF HEAVEN",195,384,22,ink(),true,true)
     _text("Choose one law to bend for the rest of this scroll.",195,415,12,accent(),true)
     for i in range(main.boon_cards.size()):
         var data=main.BoonCatalog.boon(main.boon_cards[i])
@@ -259,7 +307,8 @@ func _draw_settings() -> void:
         ["MUSIC",main.music_on],
         ["GENTLE HAPTICS",main.haptics_on],
         ["REDUCE MOTION",main.reduce_motion],
-        ["HIGH CONTRAST",main.show_high_contrast]
+        ["HIGH CONTRAST",main.show_high_contrast],
+        ["SPECTACLE & MAYHEM FX",main.spectacle_on]
     ]
     for i in range(rows.size()):
         var r=Rect2(39,280+i*75,315,66)
@@ -298,7 +347,13 @@ func _draw_actor_inspect() -> void:
             else:
                 _button(Rect2(113,583,240,51),"LEARN THE NEXT FORM",true,ready,13)
         return
-    _panel(Rect2(28,519,334,131),.975)
+    _panel(Rect2(28,487,334,163),.975)
+    var route=main.ChainCatalog.hint_for(str(a.data.id))
+    if not route.is_empty():
+        var route_steps=PackedStringArray()
+        for step in route.steps:route_steps.append(str(step).to_upper())
+        _text("HIDDEN ROUTE  "+" › ".join(route_steps),195,509,10,accent(),true)
+    else:_text("NO SECRET ROUTE RECORDED",195,509,10,accent(),true)
     _text(str(a.data.name)+"  ·  ESTATE %d / 5"%a.building_level,195,543,16,ink(),true,true)
     _text(str(a.data.short)+" · %d IMPACTS · %s"%[a.activation_count,a.discipline.to_upper()],195,563,10,accent(),true)
     var oaths=0
@@ -312,7 +367,37 @@ func _draw_actor_inspect() -> void:
 func _draw_transient() -> void:
     if main.banner_timer>0 and main.phase!="menu" and main.phase!="settings":
         var alpha:float=clampf(main.banner_timer,0.0,1.0)
-        draw_rect(Rect2(33,211,324,45),Color(.97,.96,.91,.90*alpha))
-        _text(main.banner_text,195,240,12,Color(accent(),alpha),true)
+        var y:float=301 if main.tutorial_stage>=0 and main.tutorial_hint_timer>0 else 211
+        draw_rect(Rect2(33,y,324,45),Color(.97,.96,.91,.90*alpha))
+        var size:int=12 if main.banner_text.length()<40 else 10
+        _text(main.banner_text,195,y+29,size,Color(accent(),alpha),true)
     if main.status_timer>0 and main.phase!="menu":
         _text(main.status_text,195,641,11,Color(ink(),clampf(main.status_timer,0,1)),true)
+    if main.tutorial_stage>=0 and main.tutorial_hint_timer>0 and main.phase in ["build","aim","dropping","report"]:
+        _draw_tutorial()
+
+func _draw_tutorial() -> void:
+    var stage:int=main.tutorial_stage
+    var titles=["WELCOME TO THE MESS","AIM YOUR FATE","MAKE A SCENE","KEEP THE LOOT"]
+    var hints=[
+        "Three locals are free. Tap PLAY to begin.",
+        "Pick a stance. Aim the pearl. Let it fly!",
+        "Earn QI on hits. Tap a pearl to parry!",
+        "Two pearls, one payday. Turn the page!"
+    ]
+    if stage<0 or stage>=titles.size():return
+    var alpha:float=minf(1.0,main.tutorial_hint_timer/.5)
+    var back=Color("#1D3735")
+    back.a=.94*alpha
+    draw_rect(Rect2(23,199,344,85),back)
+    draw_rect(Rect2(23,199,344,85),Color(.97,.76,.42,.92*alpha),false,2.0)
+    _text("FIRST DREAM  ·  %d / 4"%(stage+1),39,215,10,Color(1,.81,.45,alpha))
+    _text(str(titles[stage]),39,244,17,Color(1,.98,.87,alpha))
+    _text(str(hints[stage]),39,265,11,Color(1,.92,.81,alpha))
+    _button(Rect2(282,209,79,47),"SKIP",false,true,12)
+    var target:Rect2=Rect2(285,762,88,47)
+    if main.phase=="aim":target=Rect2(42,756,306,51)
+    elif main.phase=="dropping":target=Rect2(35,759,320,48)
+    elif main.phase=="report":target=Rect2(40,755,310,55)
+    var breathe:float=.0 if main.reduce_motion else (sin(main.elapsed*7.0)+1.0)*.5
+    draw_rect(target.grow(2.0+breathe*2.0),Color(.96,.59,.23,(.7+breathe*.25)*alpha),false,2.5)

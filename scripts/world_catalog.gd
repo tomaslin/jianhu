@@ -1,5 +1,6 @@
 class_name WorldCatalog
 extends RefCounted
+const ChainCatalog=preload("res://scripts/chain_catalog.gd")
 
 # Each scroll has a distinct physical modifier, board topology and way to earn.
 # Economic values are playable first-pass tuning, never random UI decorations.
@@ -79,9 +80,36 @@ static func actor(actor_id: String) -> Dictionary:
 static func offers(index: int, owned: Array[String], rng: RandomNumberGenerator) -> Array[String]:
     var options: Array[String] = []
     var pool: Array = world(index).pool.duplicate()
-    while options.size() < 3 and options.size() < pool.size():
-        var candidate: String = pool[rng.randi_range(0, pool.size() - 1)]
-        if not options.has(candidate):
-            options.append(candidate)
+    # Three distinct roles in the draft: a potential partner for the town's
+    # existing chain routes, a less familiar discipline, and a wild arrival.
+    # This is deliberately seeded so a run is reproducible by its RNG state.
+    var familiar_tags:Dictionary={}
+    for owned_id in owned:
+        for tag in actor(owned_id).tags:familiar_tags[str(tag)]=true
+    for slot in range(mini(3,pool.size())):
+        var weights:Array[int]=[]
+        var sum_weights:int=0
+        for candidate in pool:
+            var info:Dictionary=actor(str(candidate))
+            var synergy_score:int=ChainCatalog.synergy(str(candidate),owned)
+            var novelty:int=0
+            for tag in info.tags:
+                if not familiar_tags.has(str(tag)):novelty+=1
+            var weight:int=12
+            if slot==0:weight+=synergy_score*5
+            elif slot==1:weight+=novelty*9+synergy_score
+            else:weight+=synergy_score*2+novelty*2
+            if owned.has(str(candidate)):weight=maxi(2,weight/3)
+            weights.append(weight)
+            sum_weights+=weight
+        var draw:int=rng.randi_range(0,sum_weights-1)
+        var chosen_index:int=0
+        for i in range(pool.size()):
+            draw-=weights[i]
+            if draw<0:
+                chosen_index=i
+                break
+        options.append(str(pool[chosen_index]))
+        pool.remove_at(chosen_index)
     return options
 
