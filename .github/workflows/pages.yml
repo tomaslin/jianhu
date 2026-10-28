@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      XDG_DATA_HOME: ${{ runner.temp }}/jianghu-data
-      XDG_CONFIG_HOME: ${{ runner.temp }}/jianghu-config
-      XDG_CACHE_HOME: ${{ runner.temp }}/jianghu-cache
+      XDG_DATA_HOME: /tmp/jianghu-data
+      XDG_CONFIG_HOME: /tmp/jianghu-config
+      XDG_CACHE_HOME: /tmp/jianghu-cache
     steps:
       - name: Checkout game source
         uses: actions/checkout@v4
