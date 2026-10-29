@@ -404,7 +404,7 @@ func _draw_transient() -> void:
         draw_rect(Rect2(33,y,324,45),Color(.97,.96,.91,.90*alpha))
         var size:int=12 if main.banner_text.length()<40 else 10
         _text(main.banner_text,195,y+29,size,Color(accent(),alpha),true)
-    if main.status_timer>0 and main.phase!="menu":
+    if main.status_timer>0 and main.phase not in ["menu","dropping"]:
         _text(main.status_text,195,641,11,Color(ink(),clampf(main.status_timer,0,1)),true)
     if main.tutorial_stage>=0 and main.tutorial_hint_timer>0 and main.phase in ["build","aim","dropping","report"]:
         _draw_tutorial()
@@ -422,7 +422,7 @@ func _draw_tutorial() -> void:
     _button(Rect2(282,209,79,47),"SKIP",false,true,12)
     var target:Rect2=Rect2(285,762,88,47)
     if main.phase=="aim":target=Rect2(42,756,306,51)
-    elif main.phase=="dropping":target=Rect2(35,759,320,48)
+    elif main.phase=="dropping":return
     elif main.phase=="report":target=Rect2(40,755,310,55)
     var breathe:float=.0 if main.reduce_motion else (sin(main.elapsed*7.0)+1.0)*.5
     draw_rect(target.grow(2.0+breathe*2.0),Color(.96,.59,.23,(.7+breathe*.25)*alpha),false,2.5)
