@@ -8,6 +8,7 @@
 Thumbs.db
 *.tmp
 *.swp
+__pycache__/
 
 # Local export products belong in the compiled Web release, not in source.
 /index.wasm

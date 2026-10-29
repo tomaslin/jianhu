@@ -16,6 +16,8 @@ const RivalScript=preload("res://scripts/rival.gd")
 const W:float=390.0
 const H:float=844.0
 const BOARD_RECT:=Rect2(26.0,174.0,338.0,474.0)
+const MENU_PREV_RECT:=Rect2(28,438,44,44)
+const MENU_NEXT_RECT:=Rect2(318,438,44,44)
 const SAVE_PATH: String="user://jianghu_save.json"
 
 var phase:String="menu"
@@ -1987,10 +1989,10 @@ func _press_at(pos:Vector2) -> void:
         queue_redraw()
         return
     if phase=="menu":
-        if Rect2(292,546,68,76).has_point(pos):
+        if MENU_NEXT_RECT.has_point(pos):
             selected_world=(selected_world+1)%8
             _refresh_world(selected_world)
-        elif Rect2(28,546,68,76).has_point(pos):
+        elif MENU_PREV_RECT.has_point(pos):
             selected_world=(selected_world+7)%8
             _refresh_world(selected_world)
         elif Rect2(49,682,292,60).has_point(pos):

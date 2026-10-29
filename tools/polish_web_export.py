@@ -30,9 +30,41 @@ def main() -> None:
         '\t\t<meta name="apple-mobile-web-app-capable" content="yes">\n'
         '\t\t<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
         '\t\t<meta name="description" content="An ink-wash Jianghu pinball roguelike: eight worlds, living cities and four-form kung fu training.">\n'
-        '\t\t<meta name="jianghu-web-shell" content="1">',
+        '\t\t<meta name="jianghu-web-shell" content="2">',
     )
     html = replace_once(html, 'src="index.png" alt=""', 'src="cover.webp" alt=""')
+    html = replace_once(
+        html, '<canvas id="canvas">',
+        '<main id="game-frame" aria-label="Dreaming of Jianghu">\n'
+        '\t\t<canvas id="canvas" width="390" height="844" tabindex="0" aria-label="Game canvas">',
+    )
+    html = replace_once(html, '\t\t<script src="index.js"></script>',
+                        '\t\t</main>\n\n\t\t<script src="index.js"></script>')
+    # Resize the backing buffer to the fitted portrait frame. Godot's full-window
+    # policy would overwrite the CSS size and expand this fixed-coordinate HUD.
+    html = replace_once(html, 'const engine = new Engine(GODOT_CONFIG);', """
+const canvas = document.getElementById('canvas');
+const gameFrame = document.getElementById('game-frame');
+function fitCanvas() {
+    const bounds = gameFrame.getBoundingClientRect();
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(bounds.width * scale));
+    const height = Math.max(1, Math.round(bounds.height * scale));
+    if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+    }
+}
+new ResizeObserver(fitCanvas).observe(gameFrame);
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('pageshow', fitCanvas);
+fitCanvas();
+const engine = new Engine(GODOT_CONFIG);""".strip())
+    html = replace_once(
+        html, "statusOverlay.style.visibility = 'visible';",
+        "statusOverlay.style.visibility = 'visible';\n"
+        "\t\tstatusOverlay.classList.toggle('has-notice', mode === 'notice');",
+    )
     html = replace_once(
         html,
         '\t\t\t<progress id="status-progress"></progress>',
@@ -56,14 +88,29 @@ def main() -> None:
 /* Jianghu-web-shell: original atmospheric loading scene over Godot's canvas. */
 html { height: 100%; background: #182722; }
 body {
+    --game-width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)),
+        calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 390 / 844));
     height: 100%; height: 100dvh;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+        env(safe-area-inset-bottom) env(safe-area-inset-left);
+    display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at 50% 30%, #405046 0%, #182722 66%);
     overscroll-behavior: none;
     -webkit-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
-#canvas { margin-inline: auto; touch-action: none; }
+@supports (height: 100dvh) {
+    body { --game-width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)),
+        calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 390 / 844)); }
+}
+#game-frame {
+    position: relative; flex: none; overflow: hidden;
+    width: var(--game-width); height: calc(var(--game-width) * 844 / 390);
+    box-shadow: 0 0 70px rgba(0,0,0,.4);
+}
+#canvas { width: 100%; height: 100%; touch-action: none; }
 #status { z-index: 5; overflow: hidden; color: #f8ebce; background: #253129; }
 #status-splash, #status-splash.fullsize--true {
     position: absolute; inset: 0; width: 100%; height: 100%;
@@ -89,7 +136,8 @@ body {
 #loading-foot { position: absolute; z-index: 2; bottom: 9%; left: 12%; right: 12%;
     color: #e9d8b8; text-align: center; font: 10px/1.6 Georgia,serif; letter-spacing: .12em; }
 #status-notice { z-index: 4; background: rgba(24,39,34,.95); color: #fff3dc;
-    border-color: #b58b65; max-width: 34rem; }
+    border-color: #b58b65; max-width: 34rem; position: relative; }
+#status.has-notice #loading-words, #status.has-notice #loading-foot { display: none; }
 #rotate-hint { display: none; }
 @media (orientation: landscape) and (max-height: 550px) and (pointer: coarse) {
     #rotate-hint { display: flex; position: fixed; z-index: 6; inset: 0; padding: 2rem;

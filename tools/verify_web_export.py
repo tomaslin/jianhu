@@ -30,7 +30,7 @@ def verify(folder: Path) -> None:
     html = (folder / "index.html").read_text(encoding="utf-8")
     if "const GODOT_THREADS_ENABLED = false" not in html:
         raise SystemExit("Threaded Web export will not load on ordinary GitHub Pages")
-    if "name=\"jianghu-web-shell\"" not in html:
+    if 'name="jianghu-web-shell" content="2"' not in html:
         raise SystemExit("The branded responsive Web shell was not applied")
     if '<script src="index.js"></script>' not in html:
         raise SystemExit("Godot loader is not referenced relatively")
@@ -40,6 +40,10 @@ def verify(folder: Path) -> None:
     if config_match is None:
         raise SystemExit("Missing Godot WebAssembly boot configuration")
     config = json.loads(config_match.group(1))
+    if config.get("canvasResizePolicy") != 0:
+        raise SystemExit("The portrait Web shell must control canvas sizing")
+    if 'id="game-frame"' not in html or "new ResizeObserver(fitCanvas)" not in html:
+        raise SystemExit("Missing responsive portrait canvas frame")
     if config.get("executable") != "index":
         raise SystemExit("Godot executable basename must stay index on Pages")
     for filename, declared_size in config["fileSizes"].items():

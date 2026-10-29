@@ -113,8 +113,8 @@ func _draw_menu() -> void:
     _wrap(str(data.subtitle),195,529,14,ink())
     _rule(104,552,182)
     _wrap(str(data.rule),195,580,14,accent())
-    _button(Rect2(28,546,68,76),"‹",false,true,36)
-    _button(Rect2(294,546,68,76),"›",false,true,36)
+    _button(main.MENU_PREV_RECT,"‹",false,true,28)
+    _button(main.MENU_NEXT_RECT,"›",false,true,28)
     if main.world_stamps.has(str(data.id)):
         _text("SEALED IN THE DREAM JOURNAL",195,638,11,accent(),true)
 

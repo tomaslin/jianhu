@@ -1,13 +1,14 @@
 # Web build for GitHub Pages
 
-The companion `Dreaming_of_Jianghu_Web` directory is a release export from
-Godot 4.7.2 using the included `export_presets.cfg` (single-threaded Web).
+The live game is **[Dreaming of Jianghu](https://tomaslin.github.io/JIanhu/)**.
+Build it with Godot 4.7.2 and the included single-threaded Web preset.
 
 ## Recommended: automatic GitHub Pages deployment
 
 Upload the **contents of the Godot source project** to the root of a GitHub
 repository with default branch `main`. Under **Settings → Pages**, choose
-**Source: GitHub Actions**. The included `.github/workflows/pages.yml`
+**Source: GitHub Actions**. Enable this once as a repository administrator;
+the workflow token cannot create a Pages site. The included `.github/workflows/pages.yml`
 performs fresh Godot asset imports, 1,022+ mechanic and state-transition tests,
 eight-world live-physics trajectory tests, a real single-threaded WebAssembly
 export, and structural JS/PCK/WASM verification before uploading and
@@ -25,13 +26,13 @@ project in isolation does **not** publish itself.
 
    ```sh
    godot --headless --path . --export-release Web ../Dreaming_of_Jianghu_Web/index.html
+   cp web/cover.webp ../Dreaming_of_Jianghu_Web/cover.webp
+   touch ../Dreaming_of_Jianghu_Web/.nojekyll
    python3 tools/polish_web_export.py ../Dreaming_of_Jianghu_Web/index.html
    python3 tools/verify_web_export.py ../Dreaming_of_Jianghu_Web
    ```
 
-4. Copy `web/cover.webp` to `../Dreaming_of_Jianghu_Web/cover.webp`.
-5. Keep `../Dreaming_of_Jianghu_Web/.nojekyll` and the deployment README.
-6. If you are uploading *only the compiled web build* rather than the Godot
+4. If you are uploading *only the compiled web build* rather than the Godot
    source, commit the **web directory contents** to a separate GitHub
    repository root and enable Pages branch deployment, `main` / `(root)`.
 
@@ -42,3 +43,8 @@ large. It requires network access and an HTTP server supporting byte ranges.
 The final HTML is branded but uses the generated Godot `Engine` loader and
 native `index.js`, `index.wasm`, and `index.pck`. No gameplay has been rewritten
 in JavaScript. Run smoke/trajectory tests on the source game before shipping.
+
+The shell fits a 390 × 844 portrait frame inside Safari’s available viewport,
+respects safe-area insets, and resizes the canvas when the browser chrome or
+window changes. Keep the Web canvas resize policy at **None**: the shell
+controls the backing-buffer size, while Godot preserves the game’s aspect ratio.
