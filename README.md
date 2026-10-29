@@ -20,9 +20,9 @@
 
 Open **[Dreaming of Jianghu](https://tomaslin.github.io/jianhu/)** in Safari or another browser with WebGL 2.0. The game fits a portrait frame on phones and desktop screens. The first load downloads the game; tap or click to unlock audio.
 
-1. Choose a scroll and select **Open This Scroll**.
+1. Choose a scroll and select **Play**.
 2. Pick a companion, then tap an empty ring to place it. The opening trio is free.
-3. Select **Play**, adjust **Entry** and **Angle**, then **Release the Pearl**.
+3. Select **Play**, adjust **Entry** and **Angle**, then **Release**.
 4. Tap near a falling pearl to spend Qi on a parry. Collect your earnings and build again.
 5. Pay tribute every third day. Survive through day 15 to seal the scroll.
 

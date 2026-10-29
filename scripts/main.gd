@@ -607,12 +607,12 @@ func _draw() -> void:
         else:
             var crop_height:float=texture_size.x/target_ratio
             crop=Rect2(0,(texture_size.y-crop_height)*.5,texture_size.x,crop_height)
-        draw_texture_rect_region(world_art,Rect2(0,0,W,H),crop,Color(1,1,1,.90 if phase=="menu" else .70))
+        draw_texture_rect_region(world_art,Rect2(0,0,W,H),crop,Color(1,1,1,.98 if phase=="menu" else .84))
     _draw_painted_weather()
     if phase=="menu":return
     # The playing area is a translucent *wash* into the scenery. Uneven ink
     # edges, not an opaque rectangular UI panel, preserve the painting.
-    draw_rect(BOARD_RECT,Color(.97,.95,.87,.38))
+    draw_rect(BOARD_RECT,Color(.97,.95,.87,.22))
     for side in [BOARD_RECT.position.x,BOARD_RECT.end.x]:
         var edge=PackedVector2Array()
         for i in range(21):

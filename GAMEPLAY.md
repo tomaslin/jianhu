@@ -86,9 +86,9 @@ physical puzzle instead of an exercise in reading tooltips.
 1. Download and unzip this complete project.
 2. Open `project.godot` in **Godot 4.7.2** or a compatible 4.7 release.
 3. Press **F6** with `scenes/main.tscn` open, or **F5** to play the project.
-4. Swipe the eight scrolls, tap **Open This Scroll**, pick a draft card,
+4. Swipe the eight scrolls, tap **Play**, pick a draft card,
    tap a vacant ring to buy/place it (if you can afford it), then tap **Play**.
-5. Adjust the **Entry** and **Angle** rails by touch, then **Release the Pearl**.
+5. Adjust the **Entry** and **Angle** rails by touch, then **Release**.
    Pick Crane, Tiger or Monkey before launching; during the tumble, tap near
    a pearl to spend earned Qi on a steering parry. You can also tap the large
    **world technique** button once per day

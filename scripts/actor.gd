@@ -2,6 +2,7 @@ class_name JianghuActor
 extends StaticBody2D
 
 const ReactionScript=preload("res://scripts/reaction_catalog.gd")
+const Portraits=preload("res://scripts/portraits.gd")
 
 var data: Dictionary = {}
 var main: Node2D
@@ -79,8 +80,10 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
     if is_peg:
-        draw_circle(Vector2.ZERO, radius + 1.2, Color(0.24, 0.27, 0.23, .72))
-        draw_circle(Vector2(-1, -1), radius * .62, Color(0.72, .68, .54, .55))
+        draw_circle(Vector2(1,2), radius + 2.2, Color(.10,.15,.13,.24))
+        draw_circle(Vector2.ZERO, radius + 1.2, Color("#34483D"))
+        draw_circle(Vector2.ZERO, radius - .2, Color("#B19260"))
+        draw_circle(Vector2(-1.5,-2), radius * .46, Color("#F4DFAD"))
         return
     var accent := Color.html(str(main.world_data.accent))
     var deep := Color.html(str(main.world_data.ink))
@@ -96,15 +99,22 @@ func _draw() -> void:
     var knock:float=0.0 if main.reduce_motion else sin(idle_clock*26.0+socket.y)*pulse*.14
     draw_set_transform(Vector2(0,bob),knock,Vector2(1.0+pulse*.08,1.0-pulse*.065))
     _draw_architecture(str(data.get("kind","stone")),deep,accent)
-    draw_circle(Vector2.ZERO, radius + pulse * 6.0, Color(accent.r, accent.g, accent.b, .12 + pulse * .13))
-    draw_circle(Vector2.ZERO, radius + 2.0, deep)
-    draw_circle(Vector2.ZERO, radius, exterior)
+    draw_circle(Vector2(2,4), radius + 4.0, Color(.10,.15,.13,.28))
+    draw_circle(Vector2.ZERO, radius + 4.0 + pulse * 6.0, Color(accent.r, accent.g, accent.b, .22 + pulse * .13))
+    draw_circle(Vector2.ZERO, radius + 3.0, deep)
+    draw_circle(Vector2.ZERO, radius + 1.0, Color("#C7A36A"))
+    draw_circle(Vector2.ZERO, radius - .7, exterior)
+    draw_arc(Vector2(-2,-3), radius - 3.0, PI*1.08, PI*1.85, 20, Color(1,1,1,.75),1.6,true)
     if discipline!="none":
         draw_arc(Vector2.ZERO,radius+3.0,0,TAU,35,Color(school_color,.88),1.6+training_rank*.42,true)
         for rank in range(training_rank):
             draw_circle(Vector2(-17+rank*10,19.0),2.2,school_color)
     draw_arc(Vector2.ZERO, radius - 1.4, -.6, PI * 1.35, 30, accent, 1.8, true)
-    _draw_motif(str(data.get("kind", "stone")), deep, accent)
+    var portrait:int=Portraits.index_for(str(data.get("id","")))
+    if portrait>=0:
+        draw_texture_rect_region(Portraits.ART,Rect2(-15,-17,30,30),Portraits.region(portrait))
+    else:
+        _draw_motif(str(data.get("kind", "stone")), deep, accent)
     var mastery=ReactionScript.mastery_level(activation_count)
     if mastery>0:
         for rank in range(mastery):
