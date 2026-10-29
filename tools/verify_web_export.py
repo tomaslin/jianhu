@@ -20,7 +20,7 @@ def verify(folder: Path) -> None:
         "index.audio.position.worklet.js",
         "index.icon.png",
         "index.apple-touch-icon.png",
-        "cover.webp",
+        "cover.png",
         ".nojekyll",
     )
     for name in expected:

@@ -121,10 +121,17 @@ func _draw() -> void:
     var halo:float=13.6+impact_bloom*5.0
     draw_circle(Vector2.ZERO,halo,Color(base,.11+impact_bloom*.16))
     draw_arc(Vector2.ZERO,13.3,PI*.16,PI*1.92,35,Color(ink,.33),1.15,true)
-    # The albedo is authored watercolor rather than a flat primitive. A
-    # slightly oversized translucent silhouette remains readable on iPhone.
-    var painting:Texture2D=PEARL_ART.get(variant,PEARL_ART["jade"])
-    draw_texture_rect(painting,Rect2(-15.3,-15.3,30.6,30.6),false,Color(1,1,1,.98))
+    # Expressive jewel faces remain readable at phone size and make each
+    # transformation feel like a different little character.
+    draw_circle(Vector2(1.5,3),11.5,Color(ink,.35))
+    draw_circle(Vector2.ZERO,11.5,ink)
+    draw_circle(Vector2(0,-1),10.2,base)
+    draw_circle(Vector2(-4,-5),3.1,Color(1,1,1,.50))
+    draw_circle(Vector2(-3,-1),1.8,ink)
+    draw_circle(Vector2(3,-1),1.8,ink)
+    draw_circle(Vector2(-3.4,-1.7),.55,Color.WHITE)
+    draw_circle(Vector2(2.6,-1.7),.55,Color.WHITE)
+    draw_arc(Vector2(0,2),3.3,.10,PI-.10,14,ink,1.7,true)
     if statuses.has("drunk"):draw_arc(Vector2.ZERO,16.0,PI*.07,TAU*.88,26,Color(.78,.31,.30,.9),1.7,true)
     if statuses.has("blessed"):draw_arc(Vector2.ZERO,17.5,0,TAU,34,Color(.94,.73,.27,.77),1.35,true)
     if statuses.has("cursed") or statuses.has("poison"):

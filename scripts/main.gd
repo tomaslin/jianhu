@@ -40,6 +40,8 @@ var shot_number:int=0
 var builds_today:int=0
 var launch_x:float=195.0
 var aim_angle:float=0.0
+var launch_power:float=1.0
+var show_stances:bool=false
 var selected_offer:int=-1
 var offer_cards:Array[String]=[]
 var boons:Array[String]=[]
@@ -79,6 +81,7 @@ var technique_used_today:bool=false
 var street_event:int=0
 var known_chains:Dictionary={}
 var chosen_writ:String=""
+var show_writs:bool=false
 var writ_progress:int=0
 var writ_result:String=""
 var training_seals:int=0
@@ -148,7 +151,7 @@ func _refresh_world(index:int) -> void:
     world_index=clampi(index,0,7)
     world_data=Catalog.world(world_index)
     active_background=Color.html(str(world_data.palette))
-    var file="res://assets/worlds/%02d_%s.png" % [world_index+1,str(world_data.id)]
+    var file="res://assets/worlds/playful/%02d_%s.png" % [world_index+1,str(world_data.id)]
     # Art is an enhancement; a valid source build still runs with procedural ink.
     if ResourceLoader.exists(file):
         world_art=load(file)
@@ -220,6 +223,7 @@ func _physics_process(delta:float) -> void:
 
 func start_dream(index:int, resume:bool=false) -> void:
     _set_pause(false)
+    show_writs=false
     fast_speed=false
     Engine.time_scale=1.0
     _clear_board()
@@ -608,11 +612,12 @@ func _draw() -> void:
             var crop_height:float=texture_size.x/target_ratio
             crop=Rect2(0,(texture_size.y-crop_height)*.5,texture_size.x,crop_height)
         draw_texture_rect_region(world_art,Rect2(0,0,W,H),crop,Color(1,1,1,.98 if phase=="menu" else .84))
+        draw_rect(Rect2(0,0,W,H),Color(.95,.83,.67,.09))
     _draw_painted_weather()
     if phase=="menu":return
     # The playing area is a translucent *wash* into the scenery. Uneven ink
     # edges, not an opaque rectangular UI panel, preserve the painting.
-    draw_rect(BOARD_RECT,Color(.97,.95,.87,.22))
+    draw_rect(BOARD_RECT,Color(.97,.95,.87,.48 if world_index==3 else .26))
     for side in [BOARD_RECT.position.x,BOARD_RECT.end.x]:
         var edge=PackedVector2Array()
         for i in range(21):
@@ -636,6 +641,8 @@ func _draw() -> void:
                 var xy=socket_position(socket)
                 draw_arc(xy,17,0,TAU,25,Color(.32,.42,.36,.42),1.25,true)
                 draw_circle(xy,2.1,Color(.31,.42,.36,.66))
+        if selected_actor!=null and is_instance_valid(selected_actor):
+            draw_arc(selected_actor.position,25,0,TAU,36,Color(.93,.63,.22,.9),2.5,true)
         if selected_offer>=0 and selected_offer<offer_cards.size():
             var offer_id:String=offer_cards[selected_offer]
             for resident in active_actors:
@@ -648,7 +655,7 @@ func _draw() -> void:
         var vector=Vector2(sin(aim_angle),cos(aim_angle))
         for i in range(1,13):
             var t=float(i)*.11
-            var point=o+vector*275.0*t+Vector2(0,float(world_data.gravity)*.50*t*t)
+            var point=o+vector*275.0*launch_power*t+Vector2(0,float(world_data.gravity)*.50*t*t)
             if BOARD_RECT.has_point(point):
                 draw_circle(point,2.0,Color(.96,.66,.30,.76-float(i)*.043))
         draw_line(Vector2(launch_x,176),Vector2(launch_x,195),Color(.75,.39,.26,.9),2.5)
@@ -676,8 +683,9 @@ func _draw() -> void:
         var fade:float=clampf(float(stamp.life)/float(stamp.max),0,1)
         at.x=clampf(at.x,85,305)
         at.y=clampf(at.y,250,605)
-        var msg:String=str(stamp.text)
         var weight:int=int(stamp.power)
+        if weight<2:continue
+        var msg:String=str(stamp.text)
         var text_size:int=13+weight*3
         var width:float=minf(304.0,maxf(76,float(msg.length())*(8.0+weight*1.0)+23.0))
         var tint:Color=Color("#E74C3C") if weight>=3 else (Color("#E5A52E") if weight==2 else Color("#31AFA2"))
@@ -818,13 +826,13 @@ func _qi_flick(at:Vector2) -> bool:
         if nearby<distance:
             nearest=pearl
             distance=nearby
-    if nearest==null or distance>100:
+    if nearest==null or distance>140:
         status_text="Tap close to a flying pearl to parry"
         status_timer=.9
         return false
     qi_charge-=3
     qi_spent+=1
-    qi_cooldown=.42
+    qi_cooldown=.25
     var tempo:float=60.0/float(world_data.bpm)
     var progress:float=fmod(beat_clock,tempo)
     var onbeat:bool=minf(progress,tempo-progress)<.13
@@ -844,6 +852,8 @@ func _begin_aim() -> void:
     selected_offer=-1
     launch_x=195.0
     aim_angle=0.0
+    launch_power=1.0
+    show_stances=false
     banner_text="TRACE THE PATH. RELEASE A PEARL."
     banner_timer=1.8
     save_run()
@@ -863,7 +873,7 @@ func _launch() -> void:
     mayhem_tier=0
     mayhem_timer=0.0
     mayhem_triggered.clear()
-    qi_charge=2 if shot_stance=="crane" else (1 if shot_stance=="monkey" else 0)
+    qi_charge=3 if shot_stance=="crane" else (1 if shot_stance=="monkey" else 0)
     qi_spent=0
     qi_cooldown=0.0
     rescue_spent=false
@@ -877,7 +887,7 @@ func _launch() -> void:
     if world_data.mechanic=="cargo":variant="copper"
     if world_data.mechanic=="portals":variant="paper"
     var launch_speed:float=205.0 if shot_stance=="tiger" else (132.0 if shot_stance=="monkey" else 120.0)
-    _spawn_pearl(Vector2(launch_x,194),Vector2(sin(aim_angle),cos(aim_angle))*launch_speed,variant,true)
+    _spawn_pearl(Vector2(launch_x,194),Vector2(sin(aim_angle),cos(aim_angle))*launch_speed*launch_power,variant,true)
     if shot_stance=="tiger":
         debt+=35
         _comic(Vector2(launch_x,194),"TIGER DEBT!",1)
@@ -1010,9 +1020,9 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
     pearl.hits+=1
     combo_count+=1
     best_combo=maxi(best_combo,combo_count)
-    if combo_count==7:_ignite_mayhem(pearl,actor,1)
-    elif combo_count==17:_ignite_mayhem(pearl,actor,2)
-    elif combo_count==31:_ignite_mayhem(pearl,actor,3)
+    if combo_count==5:_ignite_mayhem(pearl,actor,1)
+    elif combo_count==12:_ignite_mayhem(pearl,actor,2)
+    elif combo_count==22:_ignite_mayhem(pearl,actor,3)
     var beat_duration:float=60.0/float(world_data.bpm)
     var proximity:float=minf(fmod(beat_clock,beat_duration),beat_duration-fmod(beat_clock,beat_duration))
     var on_beat:bool=proximity<.11
@@ -1768,6 +1778,7 @@ func _next_day() -> void:
 
 func _advance_day() -> void:
     day+=1
+    show_writs=false
     shot_number=0
     builds_today=0
     earnings_today=0
@@ -2023,8 +2034,17 @@ func _press_at(pos:Vector2) -> void:
                     _train_actor(selected_actor,["righteous","rogue","wanderer"][choice])
                 elif selected_actor.training_rank>0 and Rect2(113,583,240,51).has_point(pos):
                     _train_actor(selected_actor,selected_actor.discipline)
-        elif selected_offer==-1 and selected_actor==null and chosen_writ=="" and Rect2(35,589,322,50).has_point(pos):
+        elif Rect2(268,142,104,44).has_point(pos):
+            show_writs=not show_writs
+            selected_offer=-1
+            selected_actor=null
+        elif Rect2(126,762,76,47).has_point(pos):
+            _select_place(false)
+        elif Rect2(205,762,77,47).has_point(pos):
+            _select_place(true)
+        elif show_writs and selected_offer==-1 and selected_actor==null and chosen_writ=="" and Rect2(35,589,322,50).has_point(pos):
             _choose_writ(clampi(int((pos.x-35)/108),0,2))
+            show_writs=false
         elif Rect2(285,762,88,47).has_point(pos):
             _begin_aim()
         elif Rect2(16,762,107,47).has_point(pos):
@@ -2061,15 +2081,19 @@ func _press_at(pos:Vector2) -> void:
     elif phase=="aim":
         if Rect2(42,756,306,51).has_point(pos):
             _launch()
-        elif Rect2(24,596,336,48).has_point(pos):
+        elif Rect2(20,683,105,48).has_point(pos):
+            show_stances=not show_stances
+        elif show_stances and Rect2(24,596,336,48).has_point(pos):
             var choice:int=clampi(int((pos.x-24)/114),0,2)
-            if Rect2(24+choice*114,596,107,48).has_point(pos):_choose_stance(choice)
-        elif Rect2(35,674,321,38).has_point(pos):
-            launch_x=clampf(pos.x,48,342)
-        elif Rect2(35,719,321,34).has_point(pos):
-            aim_angle=clampf((pos.x-195.0)/160.0,-1.0,1.0)*.68
+            if Rect2(24+choice*114,596,107,48).has_point(pos):
+                _choose_stance(choice)
+                show_stances=false
+        elif Rect2(132,683,220,48).has_point(pos):
+            launch_power=lerpf(.65,1.4,clampf((pos.x-140.0)/200.0,0,1))
         elif BOARD_RECT.has_point(pos):
-            aim_angle=clampf((pos.x-launch_x)/220.0,-1.0,1.0)*.68
+            launch_x=clampf(pos.x,48,342)
+            aim_angle=0.0
+            show_stances=false
     elif phase=="dropping":
         if Rect2(35,759,320,48).has_point(pos):
             _invoke_technique()
@@ -2100,17 +2124,20 @@ func _drag_at(pos:Vector2) -> void:
     if phase=="menu":
         return
     if phase=="aim":
-        if drag_origin.y>=674 and drag_origin.y<718:
-            launch_x=clampf(pos.x,48,342)
-        elif drag_origin.y>=718 and drag_origin.y<756:
-            aim_angle=clampf((pos.x-195.0)/160.0,-1.0,1.0)*.68
-        elif drag_origin.y>=596 and drag_origin.y<653:
-            pass
+        if Rect2(132,683,220,48).has_point(drag_origin):
+            launch_power=lerpf(.65,1.4,clampf((pos.x-140.0)/200.0,0,1))
         elif BOARD_RECT.has_point(drag_origin):
-            aim_angle=clampf((pos.x-launch_x)/220.0,-1.0,1.0)*.68
+            var swipe:Vector2=pos-drag_origin
+            aim_angle=clampf(atan2(swipe.x,maxf(40.0,swipe.y)),-.68,.68)
+            launch_power=clampf(.65+swipe.length()/200.0,.65,1.4)
     queue_redraw()
 
 func _release_at(pos:Vector2) -> void:
+    if phase=="aim":
+        if touch_moved and BOARD_RECT.has_point(drag_origin) and drag_origin.distance_to(pos)>=30:
+            _launch()
+            return
+        save_run()
     if phase=="menu" and touch_moved and absf(pos.x-drag_origin.x)>48:
         selected_world=(selected_world+1)%8 if pos.x<drag_origin.x else (selected_world+7)%8
         _refresh_world(selected_world)
@@ -2126,6 +2153,14 @@ func _release_at(pos:Vector2) -> void:
             selected_actor=null
     queue_redraw()
 
+func _select_place(training:bool) -> void:
+    if active_actors.is_empty():return
+    var next:int=active_actors.find(selected_actor)+1 if selected_actor!=null else 0
+    selected_actor=active_actors[next%active_actors.size()]
+    selected_offer=-1
+    show_writs=false
+    inspect_mode="training" if training else "home"
+
 func _actor_at(pos:Vector2) -> JianghuActor:
     for actor in active_actors:
         if actor.position.distance_to(pos)<29:return actor
@@ -2137,7 +2172,7 @@ func save_run() -> void:
     for actor in active_actors:
         if not is_instance_valid(actor):continue
         placements.append({"id":actor.data.id,"col":actor.socket.x,"row":actor.socket.y,"activations":actor.activation_count,"discipline":actor.discipline,"training_rank":actor.training_rank,"building_level":actor.building_level})
-    var save={"format":9,"world":world_index,"seed":seed_value,"day":day,"shot":shot_number,"stance":shot_stance,"builds_today":builds_today,"treasury":treasury,"gross":total_earned,"earnings_today":earnings_today,"debt":debt,"boons":boons,"boon_cards":boon_cards,"technique_used":technique_used_today,"street_event":street_event,"training_seals":training_seals,"seals_earned_today":seals_earned_today,"phase":phase,"placements":placements,"offers":offer_cards,"flags":run_flags,"known_chains":known_chains,"chosen_writ":chosen_writ,"writ_progress":writ_progress,"writ_result":writ_result,"rival_hp":rival.health if rival!=null and is_instance_valid(rival) else 0,"rival_defeated":rival_defeated,"launch_x":launch_x,"aim_angle":aim_angle}
+    var save={"format":9,"world":world_index,"seed":seed_value,"day":day,"shot":shot_number,"stance":shot_stance,"builds_today":builds_today,"treasury":treasury,"gross":total_earned,"earnings_today":earnings_today,"debt":debt,"boons":boons,"boon_cards":boon_cards,"technique_used":technique_used_today,"street_event":street_event,"training_seals":training_seals,"seals_earned_today":seals_earned_today,"phase":phase,"placements":placements,"offers":offer_cards,"flags":run_flags,"known_chains":known_chains,"chosen_writ":chosen_writ,"writ_progress":writ_progress,"writ_result":writ_result,"rival_hp":rival.health if rival!=null and is_instance_valid(rival) else 0,"rival_defeated":rival_defeated,"launch_x":launch_x,"aim_angle":aim_angle,"launch_power":launch_power}
     var file=FileAccess.open(SAVE_PATH,FileAccess.WRITE)
     if file!=null:file.store_string(JSON.stringify(save))
 
@@ -2193,6 +2228,7 @@ func restore_run() -> void:
     for card in json.get("offers",[]):offer_cards.append(str(card))
     launch_x=float(json.get("launch_x",195.0))
     aim_angle=float(json.get("aim_angle",0.0))
+    launch_power=clampf(float(json.get("launch_power",1.0)),.65,1.4)
     phase=str(json.get("phase","build"))
     if not tutorial_done:
         tutorial_stage=0 if phase=="build" else (1 if phase=="aim" else 3)

@@ -100,12 +100,17 @@ func _surface(r:Rect2, fill:Color, border:Color, corner:int=10) -> void:
         style.bg_color=fill
         style.border_color=border
         style.set_border_width_all(1)
-        style.set_corner_radius_all(corner)
-        style.shadow_color=Color(.08,.11,.10,.20)
-        style.shadow_size=5
-        style.shadow_offset=Vector2(0,3)
+        style.set_corner_radius_all(3)
+        style.shadow_color=Color(.10,.09,.07,.25)
+        style.shadow_size=2
+        style.shadow_offset=Vector2(2,3)
         styles[key]=style
     draw_style_box(styles[key],r)
+    # Offset, broken strokes feel like a printed seal rather than an app card.
+    var line=Color(border,.55)
+    if border.a>0:
+        draw_line(r.position+Vector2(5,2),r.position+Vector2(r.size.x*.42,2),line,1.0,true)
+        draw_line(r.end-Vector2(5,2),r.end-Vector2(r.size.x*.29,2),line,1.0,true)
 
 func _button(r:Rect2,label:String,primary:bool=true,enabled:bool=true,size:int=16) -> void:
     var face:Color=accent() if primary else paper()
@@ -148,24 +153,22 @@ func _draw_menu() -> void:
     _text("DREAMING OF",195,98,14,Color("#E9D7B1"),true,true)
     _text("JIANGHU",195,151,45,Color("#FFF6E2"),true,true)
 
-    _panel(Rect2(20,429,350,222),.89)
+    _panel(Rect2(20,429,350,140),.91)
     _text("%02d  /  08"%(main.selected_world+1),195,464,12,accent(),true)
     var data=main.world_data
     var name:String=str(data.name)
     var size:int=25 if name.length()<23 else 21
     _text(name,195,501,size,ink(),true,true)
-    _wrap(str(data.subtitle),195,529,14,ink())
-    _rule(135,552,120)
-    _wrap(str(data.rule),195,580,13,accent())
+    for i in range(8):
+        draw_circle(Vector2(139+i*16,556),3.5,accent() if i==main.selected_world else Color(ink(),.22))
     _button(main.MENU_PREV_RECT,"‹",false,true,28)
     _button(main.MENU_NEXT_RECT,"›",false,true,28)
     if main.world_stamps.has(str(data.id)):
-        _text("SEALED IN THE DREAM JOURNAL",195,638,11,accent(),true)
+        _text("✓",195,540,14,accent(),true)
 
     _button(Rect2(49,682,292,60),"PLAY  ›",true,true,19)
     if FileAccess.file_exists(main.SAVE_PATH):
         _button(Rect2(82,752,226,49),"CONTINUE DREAM",false,true,15)
-    else:_text("CHOOSE YOUR WORLD",195,785,11,Color("#F8EBD4"),true)
     _button(Rect2(328,49,45,44),"⚙",false,true,18)
 
 func _draw_status() -> void:
@@ -182,15 +185,12 @@ func _draw_status() -> void:
     _right_text(main.short_money(main.treasury),360,83,25,Color("#F4C785"),true)
     _right_text("TRIBUTE  %s"%main.short_money(main.current_tribute()),360,111,11,Color("#E8D9B9"))
     if main.rival!=null and is_instance_valid(main.rival) and not main.rival_defeated:
-        _text("RIVAL  ·  "+str(main.RivalScript.RIVALS[main.world_index].name),20,153,10,Color("#9D4037"))
+        _text("RIVAL",20,164,10,Color("#9D4037"))
         for pip in range(main.rival.max_health):
-            draw_circle(Vector2(308+pip*13,150),4.0,accent() if pip<main.rival.health else Color(ink(),.18))
-    else:_text("%d SEALS  ·  %d BOONS"%[main.training_seals,main.boons.size()],25,153,10,ink())
+            draw_circle(Vector2(77+pip*13,160),4.0,accent() if pip<main.rival.health else Color(ink(),.18))
 
 func _draw_build() -> void:
     _panel(Rect2(12,653,366,166),.965)
-    _text("COMPANIONS",23,663,10,accent())
-    _right_text("%d / %d PLACED"%[main.builds_today,main.build_limit()],367,663,10,ink())
     if main.offer_cards.is_empty():
         _text("The town rests until the next morning.",195,716,14,ink(),true)
     else:
@@ -200,79 +200,72 @@ func _draw_build() -> void:
             _surface(r,Color(.91,.84,.70,.98) if main.selected_offer==i else Color(1,.98,.93,.96),accent() if main.selected_offer==i else Color(ink(),.16),8)
             var portrait:int=Portraits.index_for(str(data.id))
             if portrait>=0:
-                draw_texture_rect_region(Portraits.ART,Rect2(r.get_center().x-17,670,34,32),Portraits.region(portrait))
+                draw_texture_rect_region(Portraits.ART,Rect2(r.get_center().x-28,670,56,55),Portraits.region(portrait))
             else:
-                _offer_icon(str(data.kind),Vector2(r.get_center().x,685))
-            _small_caption(str(data.name),r.get_center().x,711,10)
+                draw_set_transform(Vector2(r.get_center().x,696),0.0,Vector2(1.8,1.8))
+                _offer_icon(str(data.kind),Vector2.ZERO)
+                draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE)
             var cost:int=main.purchase_cost(str(data.id))
             _text("%d"%cost,r.get_center().x,746,12,accent() if main.treasury>=cost else Color("#93554C"),true)
     var can_reroll:bool=main.treasury>=60 and main.builds_today<2
     _button(Rect2(16,762,107,47),"REROLL  60",false,can_reroll,12)
+    _button(Rect2(126,762,76,47),"PLACES",false,true,10)
+    _button(Rect2(205,762,77,47),"KUNG FU",false,true,10)
+    _button(Rect2(268,142,104,44),"WRIT ✓" if main.chosen_writ!="" else ("CLOSE" if main.show_writs else "WRITS"),false,true,10)
     _button(Rect2(285,762,88,47),"PLAY  ›",true,true,14)
     if main.selected_offer>=0 and main.selected_offer<main.offer_cards.size():
         var chosen=main.Catalog.actor(main.offer_cards[main.selected_offer])
         _panel(Rect2(36,588,318,61),.96)
-        _text(str(chosen.name),195,606,14,ink(),true)
+        _text(str(chosen.name),195,607,13,ink(),true,true)
+        _text(str(chosen.short),195,625,11,ink(),true)
         var cost=main.purchase_cost(str(chosen.id))
-        _text(str(chosen.short),195,623,11,ink(),true)
-        _text("Tap an empty ring · %d taels"%cost if main.treasury>=cost else "Earn taels first · tap PLAY",195,643,11,accent(),true)
+        _text("Tap a ring · %d"%cost if main.treasury>=cost else "Earn taels first",195,642,11,accent(),true)
     elif main.selected_actor!=null and is_instance_valid(main.selected_actor):
         _draw_actor_inspect()
-    elif main.chosen_writ=="":
+    elif main.show_writs and main.chosen_writ=="":
         _panel(Rect2(28,562,334,87),.97)
-        _text("OPTIONAL CHALLENGE  ·  FAILURE ADDS DEBT",195,582,10,accent(),true)
+        _text("CHOOSE ONE  ·  FAILURE ADDS DEBT",195,582,10,accent(),true)
         var writs=main.CommissionCatalog.for_world(main.world_index)
         for i in range(writs.size()):
             _button(Rect2(35+i*108,589,104,50),str(writs[i].short),false,true,11)
-    elif main.chosen_writ!="":
+    elif main.show_writs and main.chosen_writ!="":
         var writ=main.CommissionCatalog.writ(main.chosen_writ)
         _panel(Rect2(28,586,334,63),.97)
         _text("WRIT  ·  "+str(writ.name),195,610,12,accent(),true)
         _text("%d / %d  ·  REWARD %d TAELS  ·  RISK %d"%[main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day),main.CommissionCatalog.reward_for(main.chosen_writ,main.day),main.CommissionCatalog.risk_for(main.day)],195,632,11,ink(),true)
-    else:
-        _text("Place people. Build streets. Make trouble.",195,643,12,ink(),true)
 
 func _draw_aim() -> void:
-    _panel(Rect2(14,548,362,104),.95)
-    _text("STANCE",195,566,11,accent(),true)
-    var styles=["crane","tiger","monkey"]
-    var descriptions=["CRANE  ·  2 STARTING QI & SECOND WIND","TIGER  ·  +28% TAELS, 35 DEBT PER PEARL","MONKEY  ·  BONUS PEARL, -22% PAYOUT"]
-    var chosen:int=styles.find(main.shot_stance)
-    _text(str(descriptions[maxi(0,chosen)]),195,586,11,ink(),true)
-    for i in range(3):
-        var selected:bool=main.shot_stance==str(styles[i])
-        var r:Rect2=Rect2(24+i*114,596,107,48)
-        _button(r,str(styles[i]).to_upper(),selected,true,14)
-        if selected:draw_rect(r.grow(2),Color("#E8AF41"),false,2.0)
+    if main.show_stances:
+        _panel(Rect2(14,548,362,104),.95)
+        var choices=["crane","tiger","monkey"]
+        var descriptions=["3 QI · RESCUE","MORE TAELS · 35 DEBT","EXTRA PEARL · LESS PAY"]
+        _text(str(descriptions[maxi(0,choices.find(main.shot_stance))]),195,579,11,ink(),true)
+        for i in range(3):
+            var selected:bool=main.shot_stance==str(choices[i])
+            var r:Rect2=Rect2(24+i*114,596,107,48)
+            _button(r,str(choices[i]).to_upper(),selected,true,14)
     _panel(Rect2(12,656,366,163),.965)
-    if main.chosen_writ!="":
-        var writ=main.CommissionCatalog.writ(main.chosen_writ)
-        _text("WRIT · %s  %d/%d"%[str(writ.short),main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day)],195,672,12,accent(),true)
-    else:_text("AIM",195,672,11,accent(),true)
-    _text("ENTRY",23,698,11,ink())
-    _rule(90,691,258)
-    draw_circle(Vector2(main.launch_x,691),9,accent())
-    _text("ANGLE",23,743,11,ink())
-    _rule(90,737,258)
-    draw_circle(Vector2(195+main.aim_angle/.68*160,737),9,accent())
-    _button(Rect2(42,756,306,51),"RELEASE  ›",true,true,17)
+    _button(Rect2(20,683,105,48),main.shot_stance.to_upper()+" ▾",false,true,12)
+    _text("POWER",145,693,10,ink())
+    _rule(140,715,200)
+    draw_circle(Vector2(140+(main.launch_power-.65)/.75*200,715),9,accent())
+    _button(Rect2(42,756,306,51),"LAUNCH  ›",true,true,17)
 
 func _draw_dropping() -> void:
-    _panel(Rect2(46,590,298,62),.94)
-    _text("TAP A PEARL TO PARRY  ·  3 QI",195,617,12,accent(),true)
+    _panel(Rect2(82,613,226,39),.94)
+    _text("QI",101,637,11,accent())
     for dot in range(9):
-        draw_circle(Vector2(140+dot*14,641),4,accent() if dot<main.qi_charge else Color(ink(),.16))
+        draw_circle(Vector2(139+dot*17,634),4,accent() if dot<main.qi_charge else Color(ink(),.16))
     _panel(Rect2(14,658,362,158),.88)
     if main.chosen_writ!="":
         var writ=main.CommissionCatalog.writ(main.chosen_writ)
         _text("WRIT  ·  %s   %d/%d"%[str(writ.short),main.writ_progress,main.CommissionCatalog.target_for(main.chosen_writ,main.day)],195,682,14,ink(),true,true)
-    else:_text("THIS PEARL",195,682,12,ink(),true)
-    _text("+ %s  TAELS"%main.short_money(main.earnings_drop),195,719,26,accent(),true,true)
+    _text("+ %s"%main.short_money(main.earnings_drop),195,719,26,accent(),true,true)
     if main.mayhem_timer>0:
         _text("MAYHEM ×%d  ·  COMBO %d  ·  BONUS %d%%"%[main.mayhem_tier,main.combo_count,main.mayhem_tier*12],195,743,12,Color("#C44230"),true)
-    else:_text("%d COMBO"%main.combo_count,195,743,12,ink(),true)
+    else:_text("%d ×"%main.combo_count,195,743,13,ink(),true)
     for i in range(12):
-        var lit:bool=float(i)<float(main.combo_count)/31.0*12.0 or (main.mayhem_timer>0 and i<main.mayhem_tier*4)
+        var lit:bool=float(i)<float(main.combo_count)/22.0*12.0 or (main.mayhem_timer>0 and i<main.mayhem_tier*4)
         var segment=Rect2(38+i*26.0,750,20,4.0)
         draw_rect(segment,Color("#F0B835") if lit else Color(ink(),.12))
     _button(Rect2(35,759,320,48),str(main.world_data.technique) if not main.technique_used_today else "USED FOR TODAY",true,not main.technique_used_today,12)
@@ -285,16 +278,15 @@ func _draw_dropping() -> void:
 
 func _draw_report() -> void:
     _panel(Rect2(28,653,334,163),.96)
-    _text("DAILY DAMAGE REPORT",195,681,18,ink(),true,true)
-    _text("+ %s  taels earned"%main.short_money(main.earnings_today),195,713,20,accent(),true)
+    _text("DAY COMPLETE",195,681,18,ink(),true,true)
+    _text("+ %s"%main.short_money(main.earnings_today),195,713,20,accent(),true)
     var writ_suffix="  ·  WRIT "+("✓" if main.writ_result=="completed" else "×") if main.chosen_writ!="" else ""
     _text("Treasury  %s%s"%[main.short_money(main.treasury),writ_suffix],195,744,13,ink(),true)
     _button(Rect2(40,755,310,55),"TURN THE PAGE  ›",true,true,17)
 
 func _draw_tribute() -> void:
     _panel(Rect2(28,487,334,325),.97)
-    _text("THE RED LEDGER",195,527,27,ink(),true,true)
-    _text("The magistrate has brought a calculator.",195,553,13,ink(),true)
+    _text("TRIBUTE",195,527,27,ink(),true,true)
     _rule(71,569,248)
     _text("OWED",195,595,11,ink(),true)
     _text("%s  taels"%main.short_money(main.current_tribute()),195,628,26,accent(),true)
@@ -306,8 +298,7 @@ func _draw_tribute() -> void:
 
 func _draw_boon() -> void:
     _panel(Rect2(20,342,350,468),.97)
-    _text("STEAL ONE LAW OF HEAVEN",195,384,22,ink(),true,true)
-    _text("Choose one law to bend for the rest of this scroll.",195,415,12,accent(),true)
+    _text("CHOOSE A FAVOR",195,384,22,ink(),true,true)
     for i in range(main.boon_cards.size()):
         var data=main.BoonCatalog.boon(main.boon_cards[i])
         var rect=Rect2(34,437+i*99,322,91)
@@ -317,7 +308,6 @@ func _draw_boon() -> void:
         _text(str(data.name),195,rect.position.y+28,name_size,ink(),true,true)
         _text(str(data.short),195,rect.position.y+54,11,ink(),true)
         _text("COMMON" if int(data.rarity)==1 else ("RARE" if int(data.rarity)==2 else "LEGENDARY"),195,rect.position.y+75,11,accent(),true)
-    _text("TAP A FAVOR · %d ALREADY INSCRIBED"%main.boons.size(),195,778,12,ink(),true)
 
 func _draw_ending() -> void:
     _panel(Rect2(22,294,346,522),.96)
@@ -328,14 +318,12 @@ func _draw_ending() -> void:
     _text(main.short_money(main.total_earned),195,489,47,ink(),true,true)
     _text("TAELS EARNED IN ALL",195,515,12,ink(),true)
     _text("BEST COMBO   %d"%main.best_combo,195,550,15,accent(),true)
-    _wrap("A jade pearl tells no truth about its own luck.",195,611,15,ink())
     _button(Rect2(84,674,223,55),"RETURN TO THE MAP",false,true,14)
     _button(Rect2(42,752,306,58),"DREAM AGAIN",true,true,19)
 
 func _draw_settings() -> void:
     _panel(Rect2(22,179,346,633),.965)
-    _text("THE QUIET CHAMBER",195,228,28,ink(),true,true)
-    _text("Comfort and accessibility",195,253,13,accent(),true)
+    _text("SETTINGS",195,228,28,ink(),true,true)
     var rows=[
         ["MUSIC",main.music_on],
         ["GENTLE HAPTICS",main.haptics_on],
@@ -398,12 +386,6 @@ func _draw_actor_inspect() -> void:
     _button(Rect2(201,586,151,51),"KUNG FU  ›",true,true,14)
 
 func _draw_transient() -> void:
-    if main.banner_timer>0 and main.phase!="menu" and main.phase!="settings":
-        var alpha:float=clampf(main.banner_timer,0.0,1.0)
-        var y:float=301 if main.tutorial_stage>=0 and main.tutorial_hint_timer>0 else 211
-        draw_rect(Rect2(33,y,324,45),Color(.97,.96,.91,.90*alpha))
-        var size:int=12 if main.banner_text.length()<40 else 10
-        _text(main.banner_text,195,y+29,size,Color(accent(),alpha),true)
     if main.status_timer>0 and main.phase not in ["menu","dropping"]:
         _text(main.status_text,195,641,11,Color(ink(),clampf(main.status_timer,0,1)),true)
     if main.tutorial_stage>=0 and main.tutorial_hint_timer>0 and main.phase in ["build","aim","dropping","report"]:
@@ -411,7 +393,7 @@ func _draw_transient() -> void:
 
 func _draw_tutorial() -> void:
     var stage:int=main.tutorial_stage
-    var titles=["TAP PLAY TO BEGIN","AIM AND RELEASE","TAP A PEARL TO PARRY","COLLECT YOUR EARNINGS"]
+    var titles=["TAP PLAY TO BEGIN","SWIPE TO LAUNCH","TAP A PEARL TO PARRY","COLLECT YOUR EARNINGS"]
     if stage<0 or stage>=titles.size():return
     var alpha:float=minf(1.0,main.tutorial_hint_timer/.5)
     var back=Color("#1D3735")

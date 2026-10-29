@@ -1,7 +1,7 @@
 extends RefCounted
 
 # The atlas keeps nine illustrated people on transparent, equal-sized tiles.
-const ART = preload("res://assets/companion_portraits.png")
+const ART = preload("res://assets/companion_portraits_playful.png")
 
 static func index_for(id:String) -> int:
     match id:

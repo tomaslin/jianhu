@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           "$GODOT_BIN" --headless --path . --export-release Web "$GITHUB_WORKSPACE/dist/index.html"
-          cp web/cover.webp dist/cover.webp
+          cp assets/worlds/playful/01_valley.png dist/cover.png
           touch dist/.nojekyll
           python3 tools/polish_web_export.py dist/index.html
 

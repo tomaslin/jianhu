@@ -32,7 +32,7 @@ def main() -> None:
         '\t\t<meta name="description" content="An ink-wash Jianghu pinball roguelike: eight worlds, living cities and four-form kung fu training.">\n'
         '\t\t<meta name="jianghu-web-shell" content="2">',
     )
-    html = replace_once(html, 'src="index.png" alt=""', 'src="cover.webp" alt=""')
+    html = replace_once(html, 'src="index.png" alt=""', 'src="cover.png" alt=""')
     html = replace_once(
         html, '<canvas id="canvas">',
         '<main id="game-frame" aria-label="Dreaming of Jianghu">\n'

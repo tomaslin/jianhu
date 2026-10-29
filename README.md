@@ -9,7 +9,7 @@
 [![Build and deployment](https://github.com/tomaslin/jianhu/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaslin/jianhu/actions/workflows/pages.yml)
 
 <a href="https://tomaslin.github.io/jianhu/">
-  <img src="web/cover.webp" alt="Painted mountains, rivers and teahouses in the world of Jianghu" width="300">
+  <img src="assets/worlds/playful/01_valley.png" alt="A playful riverside town in the world of Jianghu" width="300">
 </a>
 
 *Eight painted worlds. A thousand strange collisions.*
@@ -22,8 +22,8 @@ Open **[Dreaming of Jianghu](https://tomaslin.github.io/jianhu/)** in Safari or 
 
 1. Choose a scroll and select **Play**.
 2. Pick a companion, then tap an empty ring to place it. The opening trio is free.
-3. Select **Play**, adjust **Entry** and **Angle**, then **Release**.
-4. Tap near a falling pearl to spend Qi on a parry. Collect your earnings and build again.
+3. Select **Play**, then swipe down the board to aim and launch. A longer swipe adds power.
+4. Tap near a falling pearl to spend Qi on a parry. Use **Places** to upgrade a building and **Kung Fu** to train a resident. Collect your earnings and build again.
 5. Pay tribute every third day. Survive through day 15 to seal the scroll.
 
 Runs save in your browser. Use **Continue Dream** to return, and the gear button for music, haptics, contrast, reduced motion and spectacle settings.

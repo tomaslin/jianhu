@@ -51,8 +51,8 @@ for actor families, statuses, lanes, rhythm, offspring, physics or the economy.
 **The world is now far more rambunctious.** The opening dream teaches four
 actual actions—construct, aim, release, collect—in short animated stamps
 that move out of the way when you play. A large SKIP button is available
-throughout; completing or skipping the guide is remembered. At **7, 17 and
-31 consecutive contacts** the city ignites escalating, short-lived MAYHEM.
+throughout; completing or skipping the guide is remembered. At **5, 12 and
+22 consecutive contacts** the city ignites escalating, short-lived MAYHEM.
 This is a real gameplay phase: it changes physics and impulse, generates
 additional bounded pearls, raises impact payouts by 12–36%, and at the
 highest stage wipes a little debt. Each of eight worlds has three original
@@ -65,7 +65,7 @@ gameplay benefits remain intact either way.
 **You now fight back during the drop.** Each shot begins in one of three
 meaningful physical/economic stances, chosen with big touch buttons:
 
-- **Crane — precision and forgiveness.** Two starting Qi, gentler early
+- **Crane — precision and forgiveness.** Three starting Qi, gentler early
   gravity, and a once-per-drop rescue even after a few weak opening contacts.
 - **Tiger — high-risk offense.** A much faster opening velocity and 28%
   higher drop earnings, but 35 taels of debt added to each shot.
@@ -75,7 +75,7 @@ meaningful physical/economic stances, chosen with big touch buttons:
 **Qi Parry:** Named contacts produce spendable Qi, faster on the beat and
 from trained masters. During flight, *tap near a pearl* to spend three Qi on a
 directed upward martial kick. Perfect parries are stronger and pay silver.
-The nine-dot Qi bar, 420ms cooldown and range limit make the rule legible.
+The nine-dot Qi bar, 250ms cooldown and range limit make the rule legible.
 This is separate from each world's once-per-day technique. If the seed falls
 out after almost no hits, **Second Wind** brings it back once. During drafting,
 compatible secret-route citizens glow, so finding combinations becomes a
@@ -88,7 +88,7 @@ physical puzzle instead of an exercise in reading tooltips.
 3. Press **F6** with `scenes/main.tscn` open, or **F5** to play the project.
 4. Swipe the eight scrolls, tap **Play**, pick a draft card,
    tap a vacant ring to buy/place it (if you can afford it), then tap **Play**.
-5. Adjust the **Entry** and **Angle** rails by touch, then **Release**.
+5. Swipe down the board to aim and launch; a longer swipe adds power.
    Pick Crane, Tiger or Monkey before launching; during the tumble, tap near
    a pearl to spend earned Qi on a steering parry. You can also tap the large
    **world technique** button once per day
@@ -188,10 +188,10 @@ eight worlds can be finished independently; their victory stamps persist.
 | Scroll | Distinct board physics | Separate economic rule | Emotional palette |
 | --- | --- | --- | --- |
 | **Dragon Inn Valley** | Sloping roadside roofs | Three different trade districts trigger a bonus; goods can be sold | Ochre, clay, teahouse warmth |
-| **Hundred Bell Monastery** | Temple terraces, beat-synced upward air | On-beat bells re-launch and multiply returns | Sage, limestone, silence |
+| **Shaolin Bell Temple** | Temple terraces, beat-synced upward air | On-beat bells re-launch and multiply returns | Sage, limestone, silence |
 | **City of Painted Faces** | Two moving opera platforms; crosswinds | Masks change wanted status, and stage impacts pay applause | Vermilion, theatrical crimson |
 | **Nine Bridges Ghost Market** | Lateral warps and bridge rails | Crossing earns silver **and incurs debt** | Midnight blue, pale ghost light |
-| **Bamboo Sea of Drifting Swords** | Unsteady horizontal gusts and angled bamboo | Beat-timed sword gusts and split projectiles | Celadon, lacquer-black bamboo |
+| **Bamboo Sword Forest** | Unsteady horizontal gusts and angled bamboo | Beat-timed sword gusts and split projectiles | Celadon, lacquer-black bamboo |
 | **Five Poisons Marsh** | Heavy drag and underwater-like float | Poison pays more while increasing debt; a physician cashes cures | Olive, medicinal amber |
 | **Caravan of the Red Dunes** | Sideways sand drift, weight-changing cargo | Loaded pearls earn on distance and sale | Copper, ochre, far-off red |
 | **Court of the Celestial Abacus** | Gravity alternates over four-beat halves | Every fourth abacus strike multiplies the ledger | Ivory, pale gold, marble |

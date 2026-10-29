@@ -26,7 +26,7 @@ project in isolation does **not** publish itself.
 
    ```sh
    godot --headless --path . --export-release Web ../Dreaming_of_Jianghu_Web/index.html
-   cp web/cover.webp ../Dreaming_of_Jianghu_Web/cover.webp
+   cp assets/worlds/playful/01_valley.png ../Dreaming_of_Jianghu_Web/cover.png
    touch ../Dreaming_of_Jianghu_Web/.nojekyll
    python3 tools/polish_web_export.py ../Dreaming_of_Jianghu_Web/index.html
    python3 tools/verify_web_export.py ../Dreaming_of_Jianghu_Web

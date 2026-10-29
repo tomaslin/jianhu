@@ -386,14 +386,14 @@ func run_all() -> void:
     game._launch()
     var fever_pearl=game.active_pearls[0]
     var fever_actor=game.active_actors[0]
-    for contact in range(7):game._activate_actor(fever_pearl,fever_actor)
-    check(game.mayhem_tier==1 and game.mayhem_timer>0,"seven consecutive impacts ignite active mayhem physics")
+    for contact in range(5):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==1 and game.mayhem_timer>0,"five consecutive impacts ignite active mayhem physics")
     check(game.mayhem_triggered.has("1") and not game.spawn_queue.is_empty(),"first mayhem creates a physical extra pearl")
-    for contact in range(10):game._activate_actor(fever_pearl,fever_actor)
-    check(game.mayhem_tier==2 and game.mayhem_triggered.has("2"),"seventeen impacts amplify the riot")
+    for contact in range(7):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==2 and game.mayhem_triggered.has("2"),"twelve impacts amplify the riot")
     check(fever_pearl.statuses.has("blessed"),"second mayhem stage alters the pearl's combat state")
-    for contact in range(14):game._activate_actor(fever_pearl,fever_actor)
-    check(game.mayhem_tier==3 and game.mayhem_triggered.size()==3,"thirty-one impacts unlock the final distinct burst")
+    for contact in range(10):game._activate_actor(fever_pearl,fever_actor)
+    check(game.mayhem_tier==3 and game.mayhem_triggered.size()==3,"twenty-two impacts unlock the final distinct burst")
     var baseline_bank:int=game.treasury
     game._award(100,Vector2(195,350),"spectacle test")
     check(game.treasury-baseline_bank>=130,"active third-stage mayhem provides a monetary multiplier")
@@ -440,6 +440,7 @@ func run_all() -> void:
 
     game.start_dream(0)
     game._begin_aim()
+    game._press_at(Vector2(70,705))
     game._press_at(Vector2(296,618))
     check(game.shot_stance=="monkey","the 107-by-48 Monkey stance responds to actual UI touch")
     game.restore_run()
@@ -455,14 +456,14 @@ func run_all() -> void:
     game.start_dream(0)
     game._begin_aim()
     game._launch()
-    check(game.qi_charge==2,"Crane starts with two Qi towards a potential parry")
+    check(game.qi_charge==3,"Crane starts with enough Qi for a parry")
     var crane_pearl=game.active_pearls[0]
     crane_pearl.hits=2
     crane_pearl.position=Vector2(195,701)
     game._settle_pearl(crane_pearl)
     check(game.rescue_spent and game.active_pearls.has(crane_pearl),"a poor Crane drop gets exactly one physical second wind")
     check(crane_pearl.position.y<500 and crane_pearl.linear_velocity.y<0,"second wind visibly launches the seed back into the fight")
-    check(game.qi_charge==3,"rescued players receive one small additional tactical Qi charge")
+    check(game.qi_charge==4,"rescued players receive one small additional tactical Qi charge")
     game._settle_pearl(crane_pearl)
     check(not game.active_pearls.has(crane_pearl),"the same seed cannot farm infinite rescues")
     game.start_dream(0)
@@ -471,6 +472,39 @@ func run_all() -> void:
     var actor_qi:int=game.qi_charge
     game._activate_actor(game.active_pearls[0],game.active_actors[0])
     check(game.qi_charge>actor_qi,"hitting named citizens earns spendable Qi")
+
+    # Optional challenges must only capture touches when their panel is open.
+    game.start_dream(0)
+    game._finish_tutorial()
+    game.show_writs=false
+    game._press_at(Vector2(70,610))
+    check(game.chosen_writ=="","hidden challenges do not intercept board touches")
+    game._press_at(Vector2(310,160))
+    check(game.show_writs,"challenge button opens the optional choices")
+    game._press_at(Vector2(70,610))
+    check(game.chosen_writ!="" and not game.show_writs,"choosing a challenge closes the choices")
+    game.start_dream(0)
+    game._press_at(Vector2(245,785))
+    check(game.selected_actor!=null and game.inspect_mode=="training","kung fu button opens a resident's training")
+    game._begin_aim()
+    game._press_at(Vector2(340,705))
+    check(is_equal_approx(game.launch_power,1.4),"power rail selects a stronger launch")
+    game.touch_moved=false
+    game._release_at(Vector2(340,705))
+    game.launch_power=1.0
+    game.restore_run()
+    check(is_equal_approx(game.launch_power,1.4),"launch power survives a saved aim")
+    game._launch()
+    check(game.active_pearls[0].linear_velocity.length()>160,"power changes the physical launch speed")
+    game.start_dream(0)
+    game._begin_aim()
+    game.drag_origin=Vector2(160,300)
+    game.touch_moved=true
+    game._press_at(game.drag_origin)
+    game._drag_at(Vector2(220,440))
+    check(game.aim_angle>0 and game.launch_power>1.0,"a board swipe sets direction and power together")
+    game._release_at(Vector2(220,440))
+    check(game.phase=="dropping" and game.active_pearls.size()>0,"releasing the board swipe launches the pearl")
 
     # Full UI-economic state transitions, serialization, tribute and ending.
     game.start_dream(0)
