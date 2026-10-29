@@ -1,6 +1,6 @@
 # Web build for GitHub Pages
 
-The live game is **[Dreaming of Jianghu](https://tomaslin.github.io/JIanhu/)**.
+The live game is **[Dreaming of Jianghu](https://tomaslin.github.io/jianhu/)**.
 Build it with Godot 4.7.2 and the included single-threaded Web preset.
 
 ## Recommended: automatic GitHub Pages deployment

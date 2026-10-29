@@ -4,11 +4,11 @@
 
 **An ink-wash physics roguelike. Build a town, release a pearl, pay the emperor.**
 
-[**Play in your browser →**](https://tomaslin.github.io/JIanhu/) · [Gameplay guide](GAMEPLAY.md) · [Design notes](DESIGN.md)
+[**Play in your browser →**](https://tomaslin.github.io/jianhu/) · [Gameplay guide](GAMEPLAY.md) · [Design notes](DESIGN.md)
 
-[![Build and deployment](https://github.com/tomaslin/JIanhu/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaslin/JIanhu/actions/workflows/pages.yml)
+[![Build and deployment](https://github.com/tomaslin/jianhu/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaslin/jianhu/actions/workflows/pages.yml)
 
-<a href="https://tomaslin.github.io/JIanhu/">
+<a href="https://tomaslin.github.io/jianhu/">
   <img src="web/cover.webp" alt="Painted mountains, rivers and teahouses in the world of Jianghu" width="300">
 </a>
 
@@ -18,7 +18,7 @@
 
 ## Play
 
-Open **[Dreaming of Jianghu](https://tomaslin.github.io/JIanhu/)** in Safari or another browser with WebGL 2.0. The game fits a portrait frame on phones and desktop screens. The first load downloads the game; tap or click to unlock audio.
+Open **[Dreaming of Jianghu](https://tomaslin.github.io/jianhu/)** in Safari or another browser with WebGL 2.0. The game fits a portrait frame on phones and desktop screens. The first load downloads the game; tap or click to unlock audio.
 
 1. Choose a scroll and select **Open This Scroll**.
 2. Pick a companion, then tap an empty ring to place it. The opening trio is free.
@@ -51,7 +51,7 @@ godot --headless --path . --script res://tests/trajectory.gd
 
 ## Deployment
 
-Pushes to `main` run the native mechanics and physics tests, export the single-threaded WebAssembly game, validate its assets, then publish to **[GitHub Pages](https://tomaslin.github.io/JIanhu/)**. Pull requests run the build checks without publishing.
+Pushes to `main` run the native mechanics and physics tests, export the single-threaded WebAssembly game, validate its assets, then publish to **[GitHub Pages](https://tomaslin.github.io/jianhu/)**. Pull requests run the build checks without publishing.
 
 For a fork, enable **Settings → Pages → Source: GitHub Actions** once before deploying. The workflow uses the repository’s existing Pages configuration; its token does not create a Pages site. See **[Web export instructions](WEB_EXPORT.md)** for a manual build.
 

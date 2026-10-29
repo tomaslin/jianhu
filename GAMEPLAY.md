@@ -154,7 +154,7 @@ To activate in a new GitHub repository, place the *contents of this folder*
 at repository root, commit and push to `main`, and select **Settings → Pages →
 Build and deployment → Source: GitHub Actions**. Grant Actions permission to
 run if your repository requires it. The published address will normally be
-`https://YOUR-USERNAME.github.io/YOUR-REPO/`. The live game is at [tomaslin.github.io/JIanhu](https://tomaslin.github.io/JIanhu/).
+`https://YOUR-USERNAME.github.io/YOUR-REPO/`. The live game is at [tomaslin.github.io/jianhu](https://tomaslin.github.io/jianhu/).
 
 Open the game over HTTPS in Safari or a WebGL2-capable browser. Real iPhone
 Safari graphics, memory, audio-unlock and device performance still require
