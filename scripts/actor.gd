@@ -96,8 +96,9 @@ func _draw() -> void:
     # Visual-only squash, recoil and breath. Colliders remain fixed so players
     # can still learn precise trajectories through the crowded town.
     var bob:float=0.0 if main.reduce_motion else sin(idle_clock*2.8+socket.x*.73)*1.1
-    var knock:float=0.0 if main.reduce_motion else sin(idle_clock*26.0+socket.y)*pulse*.14
-    draw_set_transform(Vector2(0,bob),knock,Vector2(1.0+pulse*.08,1.0-pulse*.065))
+    var knock:float=0.0 if main.reduce_motion else sin(idle_clock*26.0+socket.y)*pulse*.22
+    var squash:float=0.0 if main.reduce_motion else pulse
+    draw_set_transform(Vector2(0,bob),knock,Vector2(1.0+squash*.18,1.0-squash*.12))
     _draw_architecture(str(data.get("kind","stone")),deep,accent)
     draw_circle(Vector2(2,4), radius + 4.0, Color(.10,.15,.13,.28))
     draw_circle(Vector2.ZERO, radius + 4.0 + pulse * 6.0, Color(accent.r, accent.g, accent.b, .22 + pulse * .13))
@@ -112,7 +113,7 @@ func _draw() -> void:
     draw_arc(Vector2.ZERO, radius - 1.4, -.6, PI * 1.35, 30, accent, 1.8, true)
     var portrait:int=Portraits.index_for(str(data.get("id","")))
     if portrait>=0:
-        draw_texture_rect_region(Portraits.ART,Rect2(-15,-17,30,30),Portraits.region(portrait))
+        draw_texture_rect_region(Portraits.ART,Rect2(-20,-24,40,40),Portraits.region(portrait))
     else:
         _draw_motif(str(data.get("kind", "stone")), deep, accent)
     var mastery=ReactionScript.mastery_level(activation_count)
@@ -127,6 +128,21 @@ func _draw() -> void:
             var angle=TAU*float(i)/3.0+idle_clock*.6
             var outward=Vector2.RIGHT.rotated(angle)*(20+14*(1-pulse))
             draw_line(outward,outward+Vector2.RIGHT.rotated(angle+.26)*10,Color(deep,pulse*.61),2.2,true)
+        if not main.reduce_motion:
+            # A quick illustrated action mark makes each character's impact
+            # visible without moving its physical collider or obscuring a pearl.
+            var kind:String=str(data.get("kind",""))
+            if kind in ["bell","drum","wheel"]:
+                for j in range(2):
+                    draw_arc(Vector2.ZERO,25.0+j*6,PI*1.08,PI*1.91,18,Color(accent,pulse*.8),2.2,true)
+            elif kind in ["figure","swords","staff","fan","bamboo","umbrella"]:
+                draw_arc(Vector2.ZERO,27,-PI*.9,-PI*.08,18,Color("#F5C45B",pulse*.9),3.2,true)
+                draw_line(Vector2(21,-19),Vector2(32,-27),Color(deep,pulse*.8),2.0,true)
+            else:
+                for j in range(3):
+                    var burst_angle:float=-PI*.8+j*PI*.3
+                    var tip=Vector2.RIGHT.rotated(burst_angle)*(25.0+8.0*(1.0-pulse))
+                    draw_circle(tip,2.8,Color(accent,pulse*.9))
     draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE)
 
 func _draw_architecture(kind:String,deep:Color,tint:Color) -> void:

@@ -24,6 +24,12 @@ func _text(s:String,x:float,y:float,size:int=15,col:Color=Color("#302E29"),cente
         xx-=font.get_string_size(s,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x*.5
     draw_string(font,Vector2(xx,y),s,HORIZONTAL_ALIGNMENT_LEFT,-1,size,col)
 
+func _chinese(s:String,x:float,y:float,size:int=16,col:Color=Color("#302E29")) -> void:
+    var font:Font=main.chinese_font
+    if font==null:return
+    var width:float=font.get_string_size(s,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x
+    draw_string(font,Vector2(x-width*.5,y),s,HORIZONTAL_ALIGNMENT_LEFT,-1,size,col)
+
 func _wrap(s:String,center_x:float,y:float,size:int=14,shade:Color=Color("#33342F")) -> void:
     var font:Font=main.ui_font
     if font==null:return
@@ -159,6 +165,7 @@ func _draw_menu() -> void:
     var name:String=str(data.name)
     var size:int=25 if name.length()<23 else 21
     _text(name,195,501,size,ink(),true,true)
+    _chinese(main.WuxiaText.world(main.selected_world,main.simplified_chinese),195,532,19,accent())
     for i in range(8):
         draw_circle(Vector2(139+i*16,556),3.5,accent() if i==main.selected_world else Color(ink(),.22))
     _button(main.MENU_PREV_RECT,"‹",false,true,28)
@@ -215,11 +222,12 @@ func _draw_build() -> void:
     _button(Rect2(285,762,88,47),"PLAY  ›",true,true,14)
     if main.selected_offer>=0 and main.selected_offer<main.offer_cards.size():
         var chosen=main.Catalog.actor(main.offer_cards[main.selected_offer])
-        _panel(Rect2(36,588,318,61),.96)
+        _panel(Rect2(36,568,318,81),.96)
+        _chinese(main.WuxiaText.actor(str(chosen.id),main.simplified_chinese),195,589,15,accent())
         _text(str(chosen.name),195,607,13,ink(),true,true)
         _text(str(chosen.short),195,625,11,ink(),true)
         var cost=main.purchase_cost(str(chosen.id))
-        _text("Tap a ring · %d"%cost if main.treasury>=cost else "Earn taels first",195,642,11,accent(),true)
+        _text("Drag or tap a ring · %d"%cost if main.treasury>=cost else "Earn taels first",195,642,11,accent(),true)
     elif main.selected_actor!=null and is_instance_valid(main.selected_actor):
         _draw_actor_inspect()
     elif main.show_writs and main.chosen_writ=="":
@@ -332,11 +340,14 @@ func _draw_settings() -> void:
         ["SPECTACLE & MAYHEM FX",main.spectacle_on]
     ]
     for i in range(rows.size()):
-        var r=Rect2(39,280+i*75,315,66)
+        var r=Rect2(39,260+i*66,315,58)
         _panel(r,.98)
-        _text(str(rows[i][0]),55,r.position.y+39,15,ink())
+        _text(str(rows[i][0]),55,r.position.y+35,15,ink())
         var state:bool=rows[i][1]
-        _text("ON" if state else "OFF",327,r.position.y+39,15,accent() if state else Color("#82827C"),true)
+        _text("ON" if state else "OFF",327,r.position.y+35,15,accent() if state else Color("#82827C"),true)
+    _panel(Rect2(39,590,315,58),.98)
+    _text("GAME CHINESE",55,625,15,ink())
+    _text("SIMP" if main.simplified_chinese else "TRAD",327,625,14,accent(),true)
     _button(Rect2(34,716,322,70),"RETURN TO THE SCROLLS",true,true,17)
 
 func _draw_actor_inspect() -> void:
@@ -393,7 +404,7 @@ func _draw_transient() -> void:
 
 func _draw_tutorial() -> void:
     var stage:int=main.tutorial_stage
-    var titles=["TAP PLAY TO BEGIN","SWIPE TO LAUNCH","TAP A PEARL TO PARRY","COLLECT YOUR EARNINGS"]
+    var titles=["DRAG A PIECE OR TAP PLAY","SWIPE TO LAUNCH","TAP A PEARL TO PARRY","COLLECT YOUR EARNINGS"]
     if stage<0 or stage>=titles.size():return
     var alpha:float=minf(1.0,main.tutorial_hint_timer/.5)
     var back=Color("#1D3735")
@@ -402,9 +413,19 @@ func _draw_tutorial() -> void:
     _text("%d / 4"%(stage+1),39,220,10,Color(1,.81,.45,alpha))
     _text(str(titles[stage]),39,243,14,Color(1,.98,.87,alpha))
     _button(Rect2(282,209,79,47),"SKIP",false,true,12)
+    if stage==1 and main.phase=="aim":
+        # A moving ink stroke demonstrates the gesture on the board itself.
+        var progress:float=.5 if main.reduce_motion else fmod(main.elapsed*.65,1.0)
+        var start=Vector2(170,305)
+        var finish=Vector2(215,425)
+        var tip=start.lerp(finish,progress)
+        draw_line(start,tip,Color(.87,.32,.20,.75*alpha),4.0,true)
+        draw_circle(tip,8,Color(.98,.76,.36,.85*alpha))
+        draw_arc(tip,12,0,TAU,24,Color(.35,.22,.16,.75*alpha),2.0,true)
     var target:Rect2=Rect2(285,762,88,47)
     if main.phase=="aim":target=Rect2(42,756,306,51)
     elif main.phase=="dropping":return
     elif main.phase=="report":target=Rect2(40,755,310,55)
+    elif main.phase=="build" and main.selected_offer<0 and not main.offer_cards.is_empty():target=Rect2(20,669,109,85)
     var breathe:float=.0 if main.reduce_motion else (sin(main.elapsed*7.0)+1.0)*.5
     draw_rect(target.grow(2.0+breathe*2.0),Color(.96,.59,.23,(.7+breathe*.25)*alpha),false,2.5)

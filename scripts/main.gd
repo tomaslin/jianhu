@@ -12,6 +12,7 @@ const ReactionCatalog=preload("res://scripts/reaction_catalog.gd")
 const ChainCatalog=preload("res://scripts/chain_catalog.gd")
 const CommissionCatalog=preload("res://scripts/commission_catalog.gd")
 const RivalScript=preload("res://scripts/rival.gd")
+const WuxiaText=preload("res://scripts/wuxia_text.gd")
 
 const W:float=390.0
 const H:float=844.0
@@ -26,6 +27,7 @@ var world_data:Dictionary={}
 var world_art:Texture2D
 var ui_font:Font
 var title_font:Font
+var chinese_font:Font
 var hud:Node2D
 var sound:Node
 var city_stage:Node2D
@@ -112,6 +114,7 @@ var fast_speed:bool=false
 var touch_id:int=-1
 var dragging:bool=false
 var drag_origin:Vector2=Vector2.ZERO
+var drag_position:Vector2=Vector2.ZERO
 var touch_moved:bool=false
 var banner_text:String=""
 var banner_timer:float=0.0
@@ -127,10 +130,12 @@ var haptics_on:bool=true
 var reduce_motion:bool=false
 var show_high_contrast:bool=false
 var spectacle_on:bool=true
+var simplified_chinese:bool=false
 
 func _ready() -> void:
     ui_font=load("res://assets/fonts/DejaVuSans.ttf")
     title_font=load("res://assets/fonts/DejaVuSerif.ttf")
+    chinese_font=load("res://assets/fonts/JianhuCJK.otf")
     _load_preferences()
     _refresh_world(0)
     city_stage=CityStageScript.new()
@@ -163,6 +168,8 @@ func _refresh_world(index:int) -> void:
 
 func _notification(what:int) -> void:
     if what==NOTIFICATION_APPLICATION_FOCUS_OUT:
+        dragging=false
+        touch_id=-1
         if phase!="dropping":
             save_run()
 
@@ -235,7 +242,8 @@ func start_dream(index:int, resume:bool=false) -> void:
         day=1
         shot_number=0
         builds_today=0
-        treasury=0
+        # Give every new player an immediately affordable first piece.
+        treasury=400
         total_earned=0
         earnings_today=0
         debt=0
@@ -426,15 +434,15 @@ func _finish_tutorial() -> void:
     tutorial_done=true
     _save_preferences()
 
-func _comic(at:Vector2,label:String,weight:int=1) -> void:
+func _comic(at:Vector2,label:String,weight:int=1,chinese:bool=false) -> void:
     if not spectacle_on:return
     spectacle_flash=maxf(spectacle_flash,.12*float(weight))
     if reduce_motion:
         # Reduced motion retains the information as a single fixed caption.
-        comic_stamps.append({"pos":at,"text":label,"life":.80,"max":.80,"power":1})
+        comic_stamps.append({"pos":at,"text":label,"life":.80,"max":.80,"power":weight,"chinese":chinese})
         if comic_stamps.size()>6:comic_stamps.pop_front()
         return
-    comic_stamps.append({"pos":at,"text":label,"life":1.0+.12*weight,"max":1.0+.12*weight,"power":weight})
+    comic_stamps.append({"pos":at,"text":label,"life":1.0+.12*weight,"max":1.0+.12*weight,"power":weight,"chinese":chinese})
     if comic_stamps.size()>12:comic_stamps.pop_front()
     var pigments=[Color("#E94A48"),Color("#F2BF42"),Color("#36A6A3"),Color("#E97731"),Color("#D75298")]
     for i in range(5+weight*6):
@@ -475,7 +483,7 @@ func _ignite_mayhem(pearl:JianghuPearl,actor:JianghuActor,tier:int) -> void:
     var title:String=str(exclamations[world_index][tier-1])
     banner_text=title
     banner_timer=2.25
-    _comic(actor.position,"MAYHEM ×%d!"%tier,3)
+    _comic(actor.position,WuxiaText.shout(world_index,simplified_chinese),3,true)
     _award(135*tier,actor.position,"jianghu uproar")
     _grant_training_seals(1,actor.position)
     # The spectacle is a scoring/trajectory phase, not a cosmetic combo badge.
@@ -641,6 +649,14 @@ func _draw() -> void:
                 var xy=socket_position(socket)
                 draw_arc(xy,17,0,TAU,25,Color(.32,.42,.36,.42),1.25,true)
                 draw_circle(xy,2.1,Color(.31,.42,.36,.66))
+        if dragging and touch_moved and selected_offer>=0 and selected_offer<offer_cards.size() and BOARD_RECT.has_point(drag_position):
+            var slot:Vector2i=socket_for_position(drag_position)
+            var target:Vector2=socket_position(slot)
+            var valid:bool=can_place(slot) and treasury>=purchase_cost(offer_cards[selected_offer]) and builds_today<build_limit()
+            var tint:Color=Color("#E9AD3D") if valid else Color("#AF4840")
+            draw_circle(target,26,Color(tint,.27))
+            draw_arc(target,26,0,TAU,36,Color(tint,.95),3.0,true)
+            draw_line(drag_position,target,Color(tint,.65),2.0,true)
         if selected_actor!=null and is_instance_valid(selected_actor):
             draw_arc(selected_actor.position,25,0,TAU,36,Color(.93,.63,.22,.9),2.5,true)
         if selected_offer>=0 and selected_offer<offer_cards.size():
@@ -687,15 +703,16 @@ func _draw() -> void:
         if weight<2:continue
         var msg:String=str(stamp.text)
         var text_size:int=13+weight*3
-        var width:float=minf(304.0,maxf(76,float(msg.length())*(8.0+weight*1.0)+23.0))
+        var stamp_font:Font=chinese_font if bool(stamp.get("chinese",false)) else ui_font
+        var width:float=minf(304.0,maxf(76,stamp_font.get_string_size(msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size).x+25.0)) if stamp_font!=null else 90.0
         var tint:Color=Color("#E74C3C") if weight>=3 else (Color("#E5A52E") if weight==2 else Color("#31AFA2"))
         var stamp_poly=PackedVector2Array([at+Vector2(-width*.52,-14),at+Vector2(width*.49,-18),at+Vector2(width*.54,14),at+Vector2(-width*.48,17)])
         draw_colored_polygon(stamp_poly,Color(tint,fade*.92))
         draw_polyline(PackedVector2Array([stamp_poly[0],stamp_poly[1],stamp_poly[2],stamp_poly[3],stamp_poly[0]]),Color(.19,.15,.13,fade*.8),2.2,true)
-        if ui_font!=null:
-            var baseline:Vector2=at+Vector2(-ui_font.get_string_size(msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size).x*.5,6)
-            draw_string_outline(ui_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,3,Color(.19,.13,.10,fade))
-            draw_string(ui_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,Color(1,.98,.91,fade))
+        if stamp_font!=null:
+            var baseline:Vector2=at+Vector2(-stamp_font.get_string_size(msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size).x*.5,6)
+            draw_string_outline(stamp_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,3,Color(.19,.13,.10,fade))
+            draw_string(stamp_font,baseline,msg,HORIZONTAL_ALIGNMENT_LEFT,-1,text_size,Color(1,.98,.91,fade))
     if not reduce_motion:
         for burst in ink_bursts:
             var fading:float=clampf(float(burst.life)/.54,0,1)
@@ -1961,6 +1978,7 @@ func _input(event:InputEvent) -> void:
         if touch.pressed and touch_id==-1:
             touch_id=touch.index
             drag_origin=touch.position
+            drag_position=touch.position
             touch_moved=false
             dragging=true
             _press_at(touch.position)
@@ -1971,21 +1989,25 @@ func _input(event:InputEvent) -> void:
     elif event is InputEventScreenDrag:
         var drag:=event as InputEventScreenDrag
         if drag.index==touch_id:
+            drag_position=drag.position
             if drag.position.distance_to(drag_origin)>15:touch_moved=true
             _drag_at(drag.position)
     elif event is InputEventMouseButton:
+        if touch_id!=-1:return
         var mb:=event as InputEventMouseButton
         if mb.button_index!=MOUSE_BUTTON_LEFT:return
         if mb.pressed:
             drag_origin=mb.position
+            drag_position=mb.position
             dragging=true
             touch_moved=false
             _press_at(mb.position)
         else:
             _release_at(mb.position)
             dragging=false
-    elif event is InputEventMouseMotion and dragging:
+    elif event is InputEventMouseMotion and dragging and touch_id==-1:
         var mm:=event as InputEventMouseMotion
+        drag_position=mm.position
         if mm.position.distance_to(drag_origin)>15:touch_moved=true
         _drag_at(mm.position)
     elif event is InputEventKey and event.pressed and not event.echo:
@@ -2015,11 +2037,12 @@ func _press_at(pos:Vector2) -> void:
     elif phase=="settings":
         if Rect2(34,716,322,70).has_point(pos):
             phase="menu"
-        elif Rect2(39,280,315,66).has_point(pos):music_on=!music_on
-        elif Rect2(39,355,315,66).has_point(pos):haptics_on=!haptics_on
-        elif Rect2(39,430,315,66).has_point(pos):reduce_motion=!reduce_motion
-        elif Rect2(39,505,315,66).has_point(pos):show_high_contrast=!show_high_contrast
-        elif Rect2(39,580,315,66).has_point(pos):spectacle_on=!spectacle_on
+        elif Rect2(39,260,315,58).has_point(pos):music_on=!music_on
+        elif Rect2(39,326,315,58).has_point(pos):haptics_on=!haptics_on
+        elif Rect2(39,392,315,58).has_point(pos):reduce_motion=!reduce_motion
+        elif Rect2(39,458,315,58).has_point(pos):show_high_contrast=!show_high_contrast
+        elif Rect2(39,524,315,58).has_point(pos):spectacle_on=!spectacle_on
+        elif Rect2(39,590,315,58).has_point(pos):simplified_chinese=!simplified_chinese
         _save_preferences()
         if sound!=null:sound.set_music_enabled(music_on)
     elif phase=="build":
@@ -2252,6 +2275,7 @@ func _load_preferences() -> void:
     reduce_motion=bool(config.get_value("visual","reduced_motion",false))
     show_high_contrast=bool(config.get_value("visual","high_contrast",false))
     spectacle_on=bool(config.get_value("visual","spectacle",true))
+    simplified_chinese=bool(config.get_value("language","simplified_chinese",false))
     tutorial_done=bool(config.get_value("progress","tutorial_done",false))
     world_stamps=config.get_value("progress","world_stamps",{})
 
@@ -2262,6 +2286,7 @@ func _save_preferences() -> void:
     config.set_value("visual","reduced_motion",reduce_motion)
     config.set_value("visual","high_contrast",show_high_contrast)
     config.set_value("visual","spectacle",spectacle_on)
+    config.set_value("language","simplified_chinese",simplified_chinese)
     config.set_value("progress","tutorial_done",tutorial_done)
     config.set_value("progress","world_stamps",world_stamps)
     config.save("user://jianghu_settings.cfg")

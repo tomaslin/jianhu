@@ -102,8 +102,11 @@ Try hitting it with an on-beat pearl or triggering your world technique near it.
 You can also accept an optional martial writ from one of the three small
 commission buttons above the construction cards before launching the day.
 
-The first day's installed trio is free. You can skip building until you've
-earned enough silver. A player's run is saved after safe phase transitions and
+The first day's installed trio is free, and a new run begins with 400 taels so
+you can place a piece straight away. Drag an offer to a glowing ring, or tap an
+offer and then a ring. In Settings, GAME CHINESE switches the in-world names and
+comic shouts between Traditional (default) and Simplified Chinese; the interface
+and explanations remain in English. A player's run is saved after safe phase transitions and
 can be resumed from the title scroll. The game is entirely offline.
 
 During building, **tap an existing household to inspect it.** From there:

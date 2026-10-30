@@ -9,6 +9,7 @@ const Reactions=preload("res://scripts/reaction_catalog.gd")
 const Chains=preload("res://scripts/chain_catalog.gd")
 const Writs=preload("res://scripts/commission_catalog.gd")
 const Rivals=preload("res://scripts/rival.gd")
+const WuxiaText=preload("res://scripts/wuxia_text.gd")
 var failures:int=0
 var checks:int=0
 
@@ -26,6 +27,26 @@ func run_all() -> void:
     root.add_child(game)
     await process_frame
     check(game.phase=="menu","opens on the illustrated world selector")
+    check(game.chinese_font!=null,"the Chinese display font is bundled")
+    for i in range(8):
+        for simplified in [false,true]:
+            var world_name:String=WuxiaText.world(i,simplified)
+            var shout:String=WuxiaText.shout(i,simplified)
+            for glyph in world_name+shout:
+                check(game.chinese_font.has_char(glyph.unicode_at(0)),"Chinese world and comic glyph is available: "+glyph)
+    for actor_spec in Catalog.ACTORS:
+        for simplified in [false,true]:
+            var actor_name:String=WuxiaText.actor(str(actor_spec.id),simplified)
+            check(WuxiaText.NAMES.has(str(actor_spec.id)),"every actor has an authored Chinese name: "+str(actor_spec.id))
+            for glyph in actor_name:
+                check(game.chinese_font.has_char(glyph.unicode_at(0)),"Chinese actor glyph is available: "+glyph)
+    game.simplified_chinese=true
+    game._save_preferences()
+    game.simplified_chinese=false
+    game._load_preferences()
+    check(game.simplified_chinese,"Chinese script preference persists")
+    game.simplified_chinese=false
+    game._save_preferences()
     check(Catalog.WORLDS.size()==8,"eight authored worlds")
     check(Catalog.ACTORS.size()==48,"48 authored economic/martial citizens")
     check(BoonCatalog.BOONS.size()==56,"56 authored rule-bending wuxia boons")
@@ -103,6 +124,10 @@ func run_all() -> void:
         check(game.board_segments.size()>=4,"world %d has unique rails"%i)
         check(game.world_art!=null,"world %d has its own art"%i)
         check(game.offer_cards.size()==3,"world %d offers choices"%i)
+        var affordable:bool=false
+        for candidate in game.offer_cards:
+            if game.purchase_cost(candidate)<=game.treasury:affordable=true
+        check(affordable,"world %d starts with an affordable piece"%i)
         check(str(spec.technique).length()>8,"world %d has a specific martial intervention"%i)
         check(game.event_name().length()>5,"world %d has a street event"%i)
         street_names[game.event_name()]=true
@@ -111,6 +136,7 @@ func run_all() -> void:
         var offer_id:String=game.offer_cards[0]
         var cost:int=int(Catalog.actor(offer_id).cost)
         var before:int=game.active_actors.size()
+        game.treasury=0
         game._purchase_actor(offer_id,Vector2i(0,1))
         check(game.active_actors.size()==before,"world %d blocks unaffordable purchases"%i)
         game.treasury=cost+100
