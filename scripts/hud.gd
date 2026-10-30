@@ -261,9 +261,12 @@ func _draw_aim() -> void:
 
 func _draw_dropping() -> void:
     _panel(Rect2(82,613,226,39),.94)
-    _text("QI",101,637,11,accent())
-    for dot in range(9):
-        draw_circle(Vector2(139+dot*17,634),4,accent() if dot<main.qi_charge else Color(ink(),.16))
+    if main.status_timer>0 and (main.status_text.begins_with("Build 3 QI") or main.status_text.begins_with("Tap close")):
+        _text("NEED 3 QI" if main.status_text.begins_with("Build 3 QI") else "TAP NEAR A PEARL",195,637,11,accent(),true)
+    else:
+        _text("QI",101,637,11,accent())
+        for dot in range(9):
+            draw_circle(Vector2(139+dot*17,634),4,accent() if dot<main.qi_charge else Color(ink(),.16))
     _panel(Rect2(14,658,362,158),.88)
     if main.chosen_writ!="":
         var writ=main.CommissionCatalog.writ(main.chosen_writ)
@@ -334,20 +337,21 @@ func _draw_settings() -> void:
     _text("SETTINGS",195,228,28,ink(),true,true)
     var rows=[
         ["MUSIC",main.music_on],
+        ["SOUND EFFECTS",main.sound_on],
         ["GENTLE HAPTICS",main.haptics_on],
         ["REDUCE MOTION",main.reduce_motion],
         ["HIGH CONTRAST",main.show_high_contrast],
         ["SPECTACLE & MAYHEM FX",main.spectacle_on]
     ]
     for i in range(rows.size()):
-        var r=Rect2(39,260+i*66,315,58)
+        var r=Rect2(39,250+i*60,315,55)
         _panel(r,.98)
         _text(str(rows[i][0]),55,r.position.y+35,15,ink())
         var state:bool=rows[i][1]
         _text("ON" if state else "OFF",327,r.position.y+35,15,accent() if state else Color("#82827C"),true)
-    _panel(Rect2(39,590,315,58),.98)
-    _text("GAME CHINESE",55,625,15,ink())
-    _text("SIMP" if main.simplified_chinese else "TRAD",327,625,14,accent(),true)
+    _panel(Rect2(39,610,315,55),.98)
+    _text("GAME CHINESE",55,645,15,ink())
+    _text("SIMP" if main.simplified_chinese else "TRAD",327,645,14,accent(),true)
     _button(Rect2(34,716,322,70),"RETURN TO THE SCROLLS",true,true,17)
 
 func _draw_actor_inspect() -> void:

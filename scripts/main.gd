@@ -65,6 +65,7 @@ var cinematic_act:int=0
 var recent_hits:Dictionary={}
 var fly_texts:Array[Dictionary]=[]
 var ink_bursts:Array[Dictionary]=[]
+var route_trails:Array[Dictionary]=[]
 var comic_stamps:Array[Dictionary]=[]
 var paper_confetti:Array[Dictionary]=[]
 var spectacle_flash:float=0.0
@@ -126,6 +127,7 @@ var active_background:Color=Color(.96,.94,.89)
 var safe_top:float=50.0
 var safe_bottom:float=36.0
 var music_on:bool=true
+var sound_on:bool=true
 var haptics_on:bool=true
 var reduce_motion:bool=false
 var show_high_contrast:bool=false
@@ -195,6 +197,8 @@ func _process(delta:float) -> void:
     for burst in ink_bursts:
         burst.life=float(burst.life)-delta
     ink_bursts=ink_bursts.filter(func(e):return float(e.life)>0.0)
+    for trail in route_trails:trail.life=float(trail.life)-delta
+    route_trails=route_trails.filter(func(e):return float(e.life)>0.0)
     if hud!=null: hud.queue_redraw()
     if city_stage!=null and phase!="menu":city_stage.queue_redraw()
     if not reduce_motion and int(elapsed*20.0)!=int((elapsed-delta)*20.0):queue_redraw()
@@ -304,6 +308,7 @@ func _clear_board() -> void:
     recent_hits.clear()
     fly_texts.clear()
     ink_bursts.clear()
+    route_trails.clear()
     comic_stamps.clear()
     paper_confetti.clear()
     spectacle_flash=0.0
@@ -641,6 +646,19 @@ func _draw() -> void:
         draw_line(segment[0]+offset,segment[1]+offset,Color(.24,.24,.22,.80),4.2,true)
         draw_line(segment[0]+offset+Vector2(0,-2),segment[1]+offset+Vector2(0,-2),Color(.89,.76,.57,.56),1.0,true)
     _draw_world_effects()
+    # The pearl's last two named contacts leave a fading ink ribbon, revealing
+    # the actual route responsible for a reaction without obscuring the board.
+    for trail in route_trails:
+        var fade:float=clampf(float(trail.life)/.9,0.0,1.0)
+        var a:Vector2=trail.a
+        var b:Vector2=trail.b
+        var middle:Vector2=(a+b)*.5+Vector2(0,-16)
+        var points:=PackedVector2Array()
+        for i in range(13):
+            var t:float=float(i)/12.0
+            points.append(a*(1-t)*(1-t)+middle*2*t*(1-t)+b*t*t)
+        draw_polyline(points,Color(.24,.18,.13,fade*.35),5.0,true)
+        draw_polyline(points,Color(.97,.65,.22,fade*.8),2.2,true)
     if phase=="build":
         for row in range(5):
             for col in range(5):
@@ -857,8 +875,9 @@ func _qi_flick(at:Vector2) -> bool:
     nearest.apply_central_impulse(Vector2(sideways,-340 if onbeat else -245))
     nearest.set_status("blessed",3 if onbeat else 2)
     if onbeat:_award(100,nearest.position,"perfect qi parry")
-    _comic(nearest.position,"PERFECT PARRY!" if onbeat else "QI SLAP!",2 if onbeat else 1)
-    if sound!=null:sound.play_impact("swords",maxi(4,combo_count),onbeat)
+    _comic(nearest.position,"PERFECT PARRY!" if onbeat else "QI SLAP!",2)
+    ink_bursts.append({"pos":nearest.position,"life":.54,"angle":rng.randf_range(0,TAU)})
+    if sound!=null:sound.play_parry()
     if haptics_on:Input.vibrate_handheld(17)
     return true
 
@@ -1075,6 +1094,11 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
         amount=int(round(float(amount)*(1.0+.18*float(new_level)+.16*float(actor.building_level-1))))
     _award(amount,actor.position,id)
     if not actor.is_peg:
+        if not reduce_motion and pearl.has_last_named_position and pearl.last_named_position.distance_to(actor.position)>1:
+            route_trails.append({"a":pearl.last_named_position,"b":actor.position,"life":.9})
+            if route_trails.size()>8:route_trails.pop_front()
+        pearl.last_named_position=actor.position
+        pearl.has_last_named_position=true
         pearl.route_history.append(id)
         if pearl.route_history.size()>5:pearl.route_history.pop_front()
         if pearl.route_recipes<5:
@@ -1088,6 +1112,8 @@ func _activate_actor(pearl:JianghuPearl,actor:JianghuActor) -> void:
         if haptics_on:Input.vibrate_handheld(14)
     if not actor.is_peg and sound!=null:
         sound.play_impact(actor.data.kind,combo_count,on_beat)
+    elif actor.is_peg and sound!=null:
+        sound.play_peg(combo_count)
     if not actor.is_peg and combo_count%4==0:
         _comic(actor.position,_whack_caption(actor),1 if combo_count<15 else 2)
     if not actor.is_peg:
@@ -2037,14 +2063,17 @@ func _press_at(pos:Vector2) -> void:
     elif phase=="settings":
         if Rect2(34,716,322,70).has_point(pos):
             phase="menu"
-        elif Rect2(39,260,315,58).has_point(pos):music_on=!music_on
-        elif Rect2(39,326,315,58).has_point(pos):haptics_on=!haptics_on
-        elif Rect2(39,392,315,58).has_point(pos):reduce_motion=!reduce_motion
-        elif Rect2(39,458,315,58).has_point(pos):show_high_contrast=!show_high_contrast
-        elif Rect2(39,524,315,58).has_point(pos):spectacle_on=!spectacle_on
-        elif Rect2(39,590,315,58).has_point(pos):simplified_chinese=!simplified_chinese
+        elif Rect2(39,250,315,55).has_point(pos):music_on=!music_on
+        elif Rect2(39,310,315,55).has_point(pos):sound_on=!sound_on
+        elif Rect2(39,370,315,55).has_point(pos):haptics_on=!haptics_on
+        elif Rect2(39,430,315,55).has_point(pos):reduce_motion=!reduce_motion
+        elif Rect2(39,490,315,55).has_point(pos):show_high_contrast=!show_high_contrast
+        elif Rect2(39,550,315,55).has_point(pos):spectacle_on=!spectacle_on
+        elif Rect2(39,610,315,55).has_point(pos):simplified_chinese=!simplified_chinese
         _save_preferences()
-        if sound!=null:sound.set_music_enabled(music_on)
+        if sound!=null:
+            sound.set_music_enabled(music_on)
+            sound.set_sound_enabled(sound_on)
     elif phase=="build":
         if selected_offer==-1 and selected_actor!=null and is_instance_valid(selected_actor) and Rect2(28,477,334,173).has_point(pos):
             if inspect_mode=="home":
@@ -2271,6 +2300,7 @@ func _load_preferences() -> void:
     var config:=ConfigFile.new()
     if config.load("user://jianghu_settings.cfg")!=OK:return
     music_on=bool(config.get_value("audio","music",true))
+    sound_on=bool(config.get_value("audio","effects",true))
     haptics_on=bool(config.get_value("touch","haptics",true))
     reduce_motion=bool(config.get_value("visual","reduced_motion",false))
     show_high_contrast=bool(config.get_value("visual","high_contrast",false))
@@ -2282,6 +2312,7 @@ func _load_preferences() -> void:
 func _save_preferences() -> void:
     var config:=ConfigFile.new()
     config.set_value("audio","music",music_on)
+    config.set_value("audio","effects",sound_on)
     config.set_value("touch","haptics",haptics_on)
     config.set_value("visual","reduced_motion",reduce_motion)
     config.set_value("visual","high_contrast",show_high_contrast)

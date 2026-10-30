@@ -106,7 +106,8 @@ The first day's installed trio is free, and a new run begins with 400 taels so
 you can place a piece straight away. Drag an offer to a glowing ring, or tap an
 offer and then a ring. In Settings, GAME CHINESE switches the in-world names and
 comic shouts between Traditional (default) and Simplified Chinese; the interface
-and explanations remain in English. A player's run is saved after safe phase transitions and
+and explanations remain in English. Settings also provides independent music
+and sound-effects switches. A player's run is saved after safe phase transitions and
 can be resumed from the title scroll. The game is entirely offline.
 
 During building, **tap an existing household to inspect it.** From there:

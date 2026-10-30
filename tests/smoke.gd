@@ -276,6 +276,8 @@ func run_all() -> void:
     var inn_actor=game.active_actors[0]
     game._activate_actor(route_pearl,tea_actor)
     game._activate_actor(route_pearl,inn_actor)
+    check(not game.route_trails.is_empty(),"two distinct named hits draw a visible route ribbon")
+    check(game.route_trails[-1].a==tea_actor.position and game.route_trails[-1].b==inn_actor.position,"the ribbon connects the actual actors involved")
     check(route_pearl.route_recipes==1,"tea then inn triggers its ordered wuxia performance")
     check(route_pearl.route_completed.has("unpaid_banquet"),"the actual route is recorded on its pearl")
     check(game.known_chains.has("unpaid_banquet"),"the new chain is discovered for this scroll")
@@ -288,6 +290,23 @@ func run_all() -> void:
     game.save_run()
     game.restore_run()
     check(game.known_chains.has("unpaid_banquet"),"named chain discoveries are serialized")
+
+    # Sound effects are independently switchable and do not change the music.
+    game.sound_on=false
+    game._save_preferences()
+    game.sound_on=true
+    game._load_preferences()
+    check(not game.sound_on,"sound effects preference persists")
+    var previous_voice:int=game.sound.impact_cursor
+    game.sound.play_peg(4)
+    check(game.sound.impact_cursor==previous_voice,"muted peg hits do not consume audio voices")
+    game.sound_on=true
+    game.sound.last_peg_sound_ms=-1000
+    game.sound.play_peg(4)
+    check(game.sound.impact_cursor==previous_voice+1,"peg hits produce musical feedback when enabled")
+    game.sound.play_peg(4)
+    check(game.sound.impact_cursor==previous_voice+1,"rapid simultaneous peg hits are rate limited")
+    game._save_preferences()
 
     # Physics modifiers must be computed from status rather than compounded
     # every tick: one previously made the ball motionless on Web after seconds.

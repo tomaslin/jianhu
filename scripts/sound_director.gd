@@ -7,6 +7,8 @@ var music_player:AudioStreamPlayer
 var impact_players:Array[AudioStreamPlayer]=[]
 var stream_cache:Dictionary={}
 var impact_cursor:int=0
+var last_peg_sound_ms:int=-1000
+const PENTATONIC:Array[float]=[1.0,1.1225,1.2599,1.4983,1.6818,2.0]
 
 func _ready() -> void:
     music_player=AudioStreamPlayer.new()
@@ -49,7 +51,7 @@ func set_music_enabled(enabled:bool) -> void:
     else:music_player.stop()
 
 func _fx(name:String,pitch:float=1.0,gain:float=0.0) -> void:
-    if impact_players.is_empty():return
+    if impact_players.is_empty() or not main.sound_on:return
     var path="res://assets/audio/fx_%s.wav"%name
     if not stream_cache.has(path):
         if not ResourceLoader.exists(path):return
@@ -58,13 +60,26 @@ func _fx(name:String,pitch:float=1.0,gain:float=0.0) -> void:
     impact_cursor+=1
     player.stream=stream_cache[path]
     player.pitch_scale=clampf(pitch,.6,2.0)
-    player.volume_db=gain-3.0 if main.reduce_motion else gain
+    # Headroom matters when multiple pearls hit at once.
+    player.volume_db=minf(gain,-3.0)-3.0 if main.reduce_motion else minf(gain,-3.0)
     player.play()
 
 func play_drop() -> void:_fx("drop",1.0)
 func play_select() -> void:_fx("tap",1.0,-8)
 func play_place() -> void:_fx("place",1.0)
 func play_magic() -> void:_fx("magic",1.0)
+func play_parry() -> void:_fx("parry",1.0,-5.0)
+func play_peg(combo:int) -> void:
+    # A quiet rising pentatonic phrase makes the basic board sing. The real-time
+    # gate limits crowding when several pearls collide in the same instant.
+    var now:int=Time.get_ticks_msec()
+    if now-last_peg_sound_ms<55:return
+    last_peg_sound_ms=now
+    var note:int=clampi(combo/3,0,PENTATONIC.size()-1)
+    _fx("peg",PENTATONIC[note]*.72,-13.0)
+func set_sound_enabled(enabled:bool) -> void:
+    if not enabled:
+        for player in impact_players:player.stop()
 func play_uproar(tier:int) -> void:
     if not main.spectacle_on:return
     # Three separately pitched original samples form a deliberately ridiculous
